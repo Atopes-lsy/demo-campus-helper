@@ -78,6 +78,14 @@ const OrderList: React.FC<Props> = ({ mode }) => {
     fetchOrders();
   }, [fetchOrders]);
 
+  // Auto-refresh for students & runners so they see status changes live
+  const needsPolling = mode === 'student-own' || mode === 'runner-deliveries';
+  useEffect(() => {
+    if (!needsPolling) return;
+    const timer = setInterval(() => { fetchOrders(); }, 10000);
+    return () => clearInterval(timer);
+  }, [needsPolling, fetchOrders]);
+
   const handleTableChange = (pag: { current?: number; pageSize?: number }) => {
     setPagination((prev) => ({
       ...prev,
@@ -306,6 +314,9 @@ const OrderList: React.FC<Props> = ({ mode }) => {
         dataSource={dataSource}
         loading={loading}
         scroll={{ x: 1200 }}
+        rowClassName={(record: OrderRecord) =>
+          mode === 'student-own' && record.status === 4 ? 'row-delivered' : ''
+        }
         pagination={{
           current: pagination.current,
           pageSize: pagination.pageSize,

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Card, Descriptions, Tag, Timeline, Button, Spin, Empty, Space,
-  Steps, Popconfirm, message, Modal, Rate, Input,
+  Steps, Popconfirm, message, Modal, Rate, Input, Alert,
 } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined, StarOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -79,6 +79,13 @@ const OrderDetail: React.FC = () => {
   };
 
   useEffect(() => { fetchData(); checkReviewStatus(); }, [id]);
+
+  // Auto-refresh every 5s so student sees runner's status changes live
+  useEffect(() => {
+    if (!id || order?.status === 5 || order?.status === 6) return;
+    const timer = setInterval(() => { fetchData(); checkReviewStatus(); }, 5000);
+    return () => clearInterval(timer);
+  }, [id, order?.status]);
 
   const doAction = async (newStatus: number, operatorType: string, successMsg: string) => {
     if (!order) return;
@@ -178,6 +185,16 @@ const OrderDetail: React.FC = () => {
           <Steps size="small" current={currentStepIndex} status="process"
             items={STATUS_STEPS.map((s) => ({ title: s.title }))} />
         </Card>
+      )}
+
+      {/* Student notification: order has been delivered */}
+      {role === 'STUDENT' && order.status === 4 && (
+        <Alert
+          type="success" showIcon banner
+          message="跑腿员已送达！请确认收货"
+          description="包裹已送达您的指定地址，确认无误后请点击下方「确认收货」按钮完成订单。"
+          style={{ marginBottom: 16 }}
+        />
       )}
 
       {actionButtons.length > 0 && (
