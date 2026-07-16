@@ -21,6 +21,10 @@ public class OrderCreateDTO {
     @NotNull(message = "Order type cannot be null")
     private Integer orderType;
 
+    /** Student placing this order */
+    @NotNull(message = "Student ID cannot be null")
+    private Long studentId;
+
     /** Packages in this order — at least one required. Size determines price. */
     @NotEmpty(message = "At least one package is required")
     @Valid

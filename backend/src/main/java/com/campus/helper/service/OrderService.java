@@ -145,8 +145,8 @@ public class OrderService {
         order.setTip(dto.getTip() != null ? dto.getTip() : BigDecimal.ZERO);
         order.setStatus(0);
 
-        // TODO: Replace placeholder with actual user context
-        Long studentId = 1L;
+        // Use student ID from the request (authenticated user)
+        Long studentId = dto.getStudentId();
         order.setStudentId(studentId);
 
         orderMapper.insert(order);

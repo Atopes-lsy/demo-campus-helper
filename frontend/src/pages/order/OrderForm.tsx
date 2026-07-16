@@ -57,6 +57,7 @@ const OrderForm: React.FC = () => {
     setSubmitting(true);
     try {
       const payload = {
+        studentId: userId,
         orderType: values.orderType,
         pickupLocation: values.pickupLocation,
         deliveryLocation: values.deliveryLocation,
