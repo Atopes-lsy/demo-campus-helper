@@ -156,7 +156,7 @@ const OrderDetail: React.FC = () => {
       }
     }
     if (role === 'RUNNER') {
-      if (order.status === 1) buttons.push(<Popconfirm key="picked" title="确认已取件？" onConfirm={() => doAction(3, 'RUNNER', '已取件，配送中')}><Button type="primary" loading={actionLoading}>已取件，开始配送</Button></Popconfirm>);
+      if (order.status === 1) buttons.push(<Popconfirm key="picked" title="确认已取件？" onConfirm={() => doAction(3, 'RUNNER', '已取件，配送中')}><Button type="primary" loading={actionLoading}>待取件，开始配送</Button></Popconfirm>);
       if (order.status === 3) buttons.push(<Popconfirm key="deliver" title="确认已送达？" onConfirm={() => doAction(4, 'RUNNER', '已送达')}><Button type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={actionLoading}>确认送达</Button></Popconfirm>);
     }
     if (role === 'ADMIN' && order.status !== 5 && order.status !== 6) {

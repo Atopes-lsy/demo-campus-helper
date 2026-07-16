@@ -234,7 +234,7 @@ const OrderList: React.FC<Props> = ({ mode }) => {
           {/* Runner actions */}
           {mode === 'runner-deliveries' && record.status === 1 && (
             <Popconfirm title="确认已取件？" onConfirm={() => handlePickedUp(record.id)}>
-              <a style={{ color: '#1677ff' }}>已取件</a>
+              <a style={{ color: '#1677ff' }}>待取件</a>
             </Popconfirm>
           )}
           {mode === 'runner-deliveries' && record.status === 3 && (
