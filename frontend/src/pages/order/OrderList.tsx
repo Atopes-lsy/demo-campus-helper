@@ -1,13 +1,17 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Table, Button, Select, Input, Tag, Space, Card, message, Popconfirm } from 'antd';
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { Table, Button, Select, Input, Tag, Space, Card, message, Popconfirm, Modal, Rate } from 'antd';
+import { PlusOutlined, SearchOutlined, StarOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getOrders, updateOrderStatus } from '../../api/order';
+import { submitReview } from '../../api/review';
 import { ORDER_TYPE_MAP, ORDER_STATUS_MAP, ORDER_TYPE_OPTIONS, ORDER_STATUS_OPTIONS } from '../../utils/dict';
 import { useAuth } from '../../contexts/AuthContext';
 
 const { Search } = Input;
+const { TextArea } = Input;
+
+const TAG_OPTIONS = ['快速', '准时', '态度好', '细心', '沟通顺畅'];
 
 export type OrderListMode = 'student-own' | 'runner-deliveries' | 'admin-all';
 
@@ -36,6 +40,15 @@ const OrderList: React.FC<Props> = ({ mode }) => {
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
   const [filters, setFilters] = useState<{ orderType?: number; status?: number; keyword?: string }>({});
+
+  // Review modal state
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewOrderId, setReviewOrderId] = useState<number | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewContent, setReviewContent] = useState('');
+  const [reviewTags, setReviewTags] = useState<string[]>([]);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const reviewedIds = useRef(new Set<number>());
 
   // Determine which role-specific pages to navigate to
   const rolePrefix = role === 'STUDENT' ? 'student' : role === 'RUNNER' ? 'runner' : 'admin';
@@ -139,6 +152,31 @@ const OrderList: React.FC<Props> = ({ mode }) => {
     } catch {
       // error handled by interceptor
     }
+  };
+
+  // ---- Review actions ----
+  const handleOpenReview = (orderId: number) => {
+    setReviewOrderId(orderId);
+    setReviewRating(5);
+    setReviewContent('');
+    setReviewTags([]);
+    setReviewModalOpen(true);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewOrderId) return;
+    setReviewSubmitting(true);
+    try {
+      await submitReview({
+        orderId: reviewOrderId, reviewerType: 1, rating: reviewRating,
+        content: reviewContent || '', tags: reviewTags.join(','),
+      });
+      message.success('评分成功！');
+      reviewedIds.current.add(reviewOrderId);
+      setReviewModalOpen(false);
+      fetchOrders();
+    } catch { /* duplicate or error — already handled */ }
+    finally { setReviewSubmitting(false); }
   };
 
   // ---- Admin actions ----
@@ -256,6 +294,12 @@ const OrderList: React.FC<Props> = ({ mode }) => {
               <a style={{ color: 'green' }}>确认收货</a>
             </Popconfirm>
           )}
+          {mode === 'student-own' && record.status === 5 && !reviewedIds.current.has(record.id) && (
+            <a style={{ color: '#faad14', fontWeight: 600 }}
+               onClick={() => handleOpenReview(record.id)}>
+              <StarOutlined /> 评分
+            </a>
+          )}
 
           {/* Runner actions */}
           {mode === 'runner-deliveries' && record.status === 1 && (
@@ -344,6 +388,37 @@ const OrderList: React.FC<Props> = ({ mode }) => {
         }}
         onChange={handleTableChange}
       />
+
+      {/* ---- Review Modal ---- */}
+      <Modal
+        title="评价跑腿员"
+        open={reviewModalOpen}
+        onOk={handleSubmitReview}
+        onCancel={() => setReviewModalOpen(false)}
+        confirmLoading={reviewSubmitting}
+        destroyOnClose
+      >
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ marginBottom: 8, fontWeight: 600 }}>评分</div>
+          <Rate value={reviewRating} onChange={setReviewRating} style={{ fontSize: 32 }} />
+          <div style={{ color: '#999', marginTop: 4 }}>{['', '很差', '较差', '一般', '较好', '非常好'][reviewRating]}</div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8, fontWeight: 600 }}>快捷标签</div>
+          <Space wrap>
+            {TAG_OPTIONS.map((t) => (
+              <Tag.CheckableTag key={t} checked={reviewTags.includes(t)}
+                onChange={(c) => setReviewTags(c ? [...reviewTags, t] : reviewTags.filter((x) => x !== t))}>
+                {t}
+              </Tag.CheckableTag>
+            ))}
+          </Space>
+        </div>
+        <div>
+          <div style={{ marginBottom: 8, fontWeight: 600 }}>评价内容（选填）</div>
+          <TextArea rows={3} value={reviewContent} onChange={(e) => setReviewContent(e.target.value)} placeholder="说说这次服务的感受吧..." />
+        </div>
+      </Modal>
     </Card>
   );
 };
