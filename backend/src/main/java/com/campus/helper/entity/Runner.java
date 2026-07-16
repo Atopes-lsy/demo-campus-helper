@@ -20,6 +20,7 @@ public class Runner {
     private String name;
     private String phone;
     private String idCard;
+    private String password;
     private Integer status;
     private BigDecimal rating;
     private Integer completedOrders;

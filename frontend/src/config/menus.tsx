@@ -9,6 +9,8 @@ import {
   TeamOutlined,
   DollarOutlined,
   AlertOutlined,
+  UserAddOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import type { ViewerRole } from '../contexts/AuthContext';
 
@@ -23,6 +25,8 @@ export const ROLE_MENUS: Record<ViewerRole, MenuItem[]> = {
   RUNNER: [
     { key: '/runner/available', icon: <UnorderedListOutlined />, label: '可接订单' },
     { key: '/runner/deliveries', icon: <CarryOutOutlined />, label: '我的配送' },
+    { key: '/runner/earnings', icon: <BarChartOutlined />, label: '收入统计' },
+    { key: '/runner/register', icon: <UserAddOutlined />, label: '跑腿员注册' },
     { key: '/ai/chat', icon: <RobotOutlined />, label: 'AI 助手' },
   ],
   ADMIN: [

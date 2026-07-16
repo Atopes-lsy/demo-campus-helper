@@ -13,6 +13,7 @@ public class Student {
     private String studentNo;
     private String name;
     private String phone;
+    private String password;
     private String dormitory;
     private String avatarUrl;
     private Integer status;

@@ -1,14 +1,17 @@
 package com.campus.helper.common;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public Result handleBusinessException(BusinessException ex) {
+        log.warn("Business error: {}", ex.getMessage());
         return Result.error(ex.getCode(), ex.getMessage());
     }
 
@@ -23,6 +26,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public Result handleException(Exception ex) {
+        log.error("Internal server error", ex);
         return Result.error(500, "服务器内部错误");
     }
 }
