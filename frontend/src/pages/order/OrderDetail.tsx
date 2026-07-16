@@ -84,7 +84,27 @@ const OrderDetail: React.FC = () => {
   const reviewRef = useRef(checkReviewStatus);
   reviewRef.current = checkReviewStatus;
 
+  // Track the status we had before the last fetch — used to detect transitions
+  const [prevStatus, setPrevStatus] = useState<number | null>(null);
+
   useEffect(() => { fetchData(); checkReviewStatus(); }, [id]);
+
+  // Auto-open review modal when order transitions to status 5 (student confirmed receipt)
+  useEffect(() => {
+    if (role === 'STUDENT' && prevStatus !== null && prevStatus !== 5 && order?.status === 5 && !alreadyReviewed) {
+      // Short delay so any Popconfirm unmount finishes
+      const t = setTimeout(() => {
+        setReviewRating(5);
+        setReviewContent('');
+        setReviewTags([]);
+        setReviewModalOpen(true);
+      }, 100);
+      return () => clearTimeout(t);
+    }
+    if (order?.status !== undefined && order.status !== prevStatus) {
+      setPrevStatus(order.status);
+    }
+  }, [order?.status, role, alreadyReviewed]);
 
   // Auto-refresh every 3s so student sees runner's status changes live
   useEffect(() => {
@@ -101,11 +121,7 @@ const OrderDetail: React.FC = () => {
       await fetchData();
       if (newStatus === 5 && operatorType === 'STUDENT') {
         setAlreadyReviewed(false);
-        // Auto-open review modal after confirming receipt
-        setReviewModalOpen(true);
-        setReviewRating(5);
-        setReviewContent('');
-        setReviewTags([]);
+        message.success('已确认收货');
       } else {
         message.success(successMsg);
       }
