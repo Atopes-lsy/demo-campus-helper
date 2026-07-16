@@ -11,10 +11,12 @@ import com.campus.helper.entity.Order;
 import com.campus.helper.entity.OrderTracking;
 import com.campus.helper.entity.Runner;
 import com.campus.helper.entity.Student;
+import com.campus.helper.entity.Payment;
 import com.campus.helper.mapper.OrderMapper;
 import com.campus.helper.mapper.OrderTrackingMapper;
 import com.campus.helper.mapper.RunnerMapper;
 import com.campus.helper.mapper.StudentMapper;
+import com.campus.helper.mapper.PaymentMapper;
 import com.campus.helper.websocket.NotificationHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,6 +42,7 @@ public class OrderService {
     private final StudentMapper studentMapper;
     private final RunnerMapper runnerMapper;
     private final NotificationHandler notificationHandler;
+    private final PaymentMapper paymentMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Price per package size: small=4, medium=5, large=8 */
@@ -150,6 +153,18 @@ public class OrderService {
         order.setStudentId(studentId);
 
         orderMapper.insert(order);
+
+        // Auto-create payment record tied to this order
+        Payment payment = new Payment();
+        payment.setPaymentNo("PAY"
+                + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + ThreadLocalRandom.current().nextInt(1000, 10000));
+        payment.setOrderId(order.getId());
+        payment.setPayerId(studentId);
+        payment.setPayeeId(0L); // runner not yet assigned
+        payment.setAmount(totalAmount.add(order.getTip() != null ? order.getTip() : BigDecimal.ZERO));
+        payment.setPayStatus(0); // pending payment
+        paymentMapper.insert(payment);
 
         // Insert initial tracking record
         OrderTracking tracking = new OrderTracking();

@@ -6,7 +6,6 @@ import com.campus.helper.common.Result;
 import com.campus.helper.entity.Order;
 import com.campus.helper.entity.Runner;
 import com.campus.helper.mapper.OrderMapper;
-import com.campus.helper.mapper.PaymentMapper;
 import com.campus.helper.mapper.RunnerMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +25,6 @@ public class StatisticsController {
 
     private final OrderMapper orderMapper;
     private final RunnerMapper runnerMapper;
-    private final PaymentMapper paymentMapper;
 
     @GetMapping("/overview")
     public Result overview() {
@@ -59,16 +57,19 @@ public class StatisticsController {
                     .divide(BigDecimal.valueOf(todayOrders), 2, RoundingMode.HALF_UP);
         }
 
-        // Today's revenue from PaymentMapper overview query
-        Map<String, Object> overview = paymentMapper.selectOverview();
-        BigDecimal todayRevenue = BigDecimal.ZERO;
-        if (overview != null && overview.get("total") != null) {
-            todayRevenue = (BigDecimal) overview.get("total");
-        }
+        // Today's revenue: sum of completed order amounts + tip
+        List<Order> completedTodayOrders = orderMapper.selectList(
+                new LambdaQueryWrapper<Order>()
+                        .ge(Order::getCompletedAt, todayStart)
+                        .eq(Order::getStatus, 5));
+        BigDecimal todayRevenue = completedTodayOrders.stream()
+                .map(o -> (o.getAmount() != null ? o.getAmount() : BigDecimal.ZERO)
+                        .add(o.getTip() != null ? o.getTip() : BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Map<String, Object> data = new HashMap<>();
-        data.put("todayOrders", todayOrders);
-        data.put("onlineRunners", onlineRunners);
+        data.put("todayOrderCount", todayOrders);
+        data.put("onlineRunnerCount", onlineRunners);
         data.put("completionRate", completionRate);
         data.put("todayRevenue", todayRevenue);
 

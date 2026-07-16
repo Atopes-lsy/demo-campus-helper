@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Table, Tag, Button, Card, message } from 'antd';
+import { Table, Tag, Button, Card, message, Space } from 'antd';
 import dayjs from 'dayjs';
-import { getAnomalies, resolveAnomaly } from '../../api/ai';
+import { getAnomalies, resolveAnomaly, triggerAnomalyScan } from '../../api/ai';
 
 const SEVERITY_MAP: Record<number, { label: string; color: string }> = {
   1: { label: '低', color: 'green' },
@@ -53,6 +53,16 @@ const AnomalyList: React.FC = () => {
       await resolveAnomaly(id);
       message.success('已标记为已处理');
       fetchAnomalies();
+    } catch {
+      // error handled by interceptor
+    }
+  };
+
+  const handleScan = async () => {
+    try {
+      await triggerAnomalyScan();
+      message.success('异常扫描已触发，请稍后刷新查看结果');
+      setTimeout(() => fetchAnomalies(), 2000);
     } catch {
       // error handled by interceptor
     }
@@ -137,7 +147,10 @@ const AnomalyList: React.FC = () => {
   ];
 
   return (
-    <Card title="异常预警">
+    <Card
+      title="异常预警"
+      extra={<Button type="primary" onClick={handleScan}>手动扫描</Button>}
+    >
       <Table
         rowKey="id"
         columns={columns}

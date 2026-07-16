@@ -8,6 +8,7 @@ import com.campus.helper.entity.AnomalyAlert;
 import com.campus.helper.mapper.AIChatHistoryMapper;
 import com.campus.helper.mapper.AnomalyAlertMapper;
 import com.campus.helper.service.AIChatService;
+import com.campus.helper.service.AnomalyDetector;
 import com.campus.helper.service.SmartPricingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +23,7 @@ public class AIController {
 
     private final AIChatService aiChatService;
     private final SmartPricingService smartPricingService;
+    private final AnomalyDetector anomalyDetector;
     private final AnomalyAlertMapper anomalyAlertMapper;
     private final AIChatHistoryMapper aiChatHistoryMapper;
 
@@ -71,5 +73,11 @@ public class AIController {
             anomalyAlertMapper.updateById(alert);
         }
         return Result.success();
+    }
+
+    @PostMapping("/anomalies/scan")
+    public Result triggerScan() {
+        anomalyDetector.scanAll();
+        return Result.success(Map.of("message", "异常扫描已触发"));
     }
 }

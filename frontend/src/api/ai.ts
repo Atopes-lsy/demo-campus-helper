@@ -14,3 +14,6 @@ export const getAnomalies = (params: Record<string, unknown>) =>
 
 export const resolveAnomaly = (id: number) =>
   request.put(`/ai/anomalies/${id}/resolve`);
+
+export const triggerAnomalyScan = () =>
+  request.post('/ai/anomalies/scan');
