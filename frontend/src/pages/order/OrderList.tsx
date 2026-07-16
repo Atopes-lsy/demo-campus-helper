@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Table, Button, Select, Input, Tag, Space, Card, message, Popconfirm } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -78,13 +78,16 @@ const OrderList: React.FC<Props> = ({ mode }) => {
     fetchOrders();
   }, [fetchOrders]);
 
-  // Auto-refresh for students & runners so they see status changes live
+  // Auto-refresh for students & runners — use ref for stable polling
+  const fetchOrdersRef = useRef(fetchOrders);
+  fetchOrdersRef.current = fetchOrders;
+
   const needsPolling = mode === 'student-own' || mode === 'runner-deliveries';
   useEffect(() => {
     if (!needsPolling) return;
-    const timer = setInterval(() => { fetchOrders(); }, 10000);
+    const timer = setInterval(() => { fetchOrdersRef.current(); }, 5000);
     return () => clearInterval(timer);
-  }, [needsPolling, fetchOrders]);
+  }, [needsPolling]);
 
   const handleTableChange = (pag: { current?: number; pageSize?: number }) => {
     setPagination((prev) => ({

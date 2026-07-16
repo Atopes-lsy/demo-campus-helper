@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Card, Descriptions, Tag, Timeline, Button, Spin, Empty, Space,
   Steps, Popconfirm, message, Modal, Rate, Input, Alert,
@@ -78,12 +78,18 @@ const OrderDetail: React.FC = () => {
     } catch { /* ignore */ }
   };
 
+  // Stable refs for polling — always call latest function
+  const fetchRef = useRef(fetchData);
+  fetchRef.current = fetchData;
+  const reviewRef = useRef(checkReviewStatus);
+  reviewRef.current = checkReviewStatus;
+
   useEffect(() => { fetchData(); checkReviewStatus(); }, [id]);
 
-  // Auto-refresh every 5s so student sees runner's status changes live
+  // Auto-refresh every 3s so student sees runner's status changes live
   useEffect(() => {
     if (!id || order?.status === 5 || order?.status === 6) return;
-    const timer = setInterval(() => { fetchData(); checkReviewStatus(); }, 5000);
+    const timer = setInterval(() => { fetchRef.current(); reviewRef.current(); }, 3000);
     return () => clearInterval(timer);
   }, [id, order?.status]);
 
