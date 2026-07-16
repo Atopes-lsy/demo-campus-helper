@@ -92,11 +92,16 @@ const OrderDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await updateOrderStatus(order.id, { newStatus, operatorId: userId, operatorType });
-      message.success(successMsg);
       await fetchData();
-      // If student just confirmed receipt (5), check review status
       if (newStatus === 5 && operatorType === 'STUDENT') {
         setAlreadyReviewed(false);
+        // Auto-open review modal after confirming receipt
+        setReviewModalOpen(true);
+        setReviewRating(5);
+        setReviewContent('');
+        setReviewTags([]);
+      } else {
+        message.success(successMsg);
       }
     } catch { /* error handled by interceptor */ }
     finally { setActionLoading(false); }
@@ -227,6 +232,17 @@ const OrderDetail: React.FC = () => {
             ) : '—'}
           </Descriptions.Item>
           <Descriptions.Item label="创建时间">{order.createdAt ? dayjs(order.createdAt).format('YYYY-MM-DD HH:mm:ss') : '—'}</Descriptions.Item>
+          <Descriptions.Item label="预估送达">
+            {order.createdAt ? (
+              (() => {
+                const estimated = dayjs(order.createdAt).add(30, 'minute');
+                const isLate = order.status < 5 && dayjs().isAfter(estimated);
+                return <span style={{ color: isLate ? 'red' : undefined, fontWeight: isLate ? 600 : undefined }}>
+                  {estimated.format('HH:mm')}{isLate ? ' (可能超时)' : ''}
+                </span>;
+              })()
+            ) : '—'}
+          </Descriptions.Item>
           <Descriptions.Item label="取件码">
             {canSeePickupCode ? (order.pickupCode || '—') : <span style={{ color: '#999' }}>接单后可见</span>}
           </Descriptions.Item>

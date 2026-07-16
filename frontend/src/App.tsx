@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu, Space, Tag, Button } from 'antd';
-import { LogoutOutlined } from '@ant-design/icons';
+import { Layout, Menu, Space, Tag, Button, FloatButton } from 'antd';
+import { LogoutOutlined, RobotOutlined } from '@ant-design/icons';
 import OrderList from './pages/order/OrderList';
 import OrderForm from './pages/order/OrderForm';
 import OrderDetail from './pages/order/OrderDetail';
@@ -151,6 +151,13 @@ const App: React.FC = () => {
             <Route path="*" element={<Navigate to={ROLE_DEFAULTS[role]} replace />} />
           </Routes>
         </Content>
+        {/* AI Assistant floating button — available on all pages */}
+        <FloatButton
+          icon={<RobotOutlined />}
+          type="primary"
+          tooltip="AI 助手"
+          onClick={() => navigate('/ai/chat')}
+        />
       </Layout>
     </Layout>
   );

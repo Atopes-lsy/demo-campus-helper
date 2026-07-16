@@ -212,11 +212,24 @@ const OrderList: React.FC<Props> = ({ mode }) => {
         record.runner?.name || '—',
     },
     {
+      title: '预估送达',
+      key: 'estimated',
+      width: 110,
+      render: (_: unknown, record: OrderRecord) => {
+        if (!record.createdAt) return '—';
+        const estimated = dayjs(record.createdAt).add(30, 'minute');
+        const isLate = record.status < 5 && dayjs().isAfter(estimated);
+        return <span style={{ color: isLate ? 'red' : undefined, fontWeight: isLate ? 600 : undefined }}>
+          {estimated.format('MM-DD HH:mm')}{isLate ? ' ⚠' : ''}
+        </span>;
+      },
+    },
+    {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 170,
-      render: (val: string) => (val ? dayjs(val).format('YYYY-MM-DD HH:mm:ss') : '—'),
+      width: 150,
+      render: (val: string) => (val ? dayjs(val).format('MM-DD HH:mm') : '—'),
     },
     {
       title: '操作',
