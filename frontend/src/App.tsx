@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu, Select, Space, Tag, Button } from 'antd';
+import { Layout, Menu, Space, Tag, Button } from 'antd';
 import { LogoutOutlined } from '@ant-design/icons';
 import OrderList from './pages/order/OrderList';
 import OrderForm from './pages/order/OrderForm';
@@ -44,7 +44,7 @@ const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const App: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { role, setRole, userId, isLoggedIn, userName, logout } = useAuth();
+  const { role, isLoggedIn, userName, logout } = useAuth();
 
   const menuItems = ROLE_MENUS[role];
   const selectedKey: string =
@@ -53,11 +53,6 @@ const App: React.FC = () => {
       ?.key?.toString() ||
     menuItems?.[0]?.key?.toString() ||
     '/';
-
-  const handleRoleChange = (newRole: ViewerRole) => {
-    setRole(newRole);
-    navigate(ROLE_DEFAULTS[newRole]);
-  };
 
   const handleLogout = () => {
     logout();
@@ -114,13 +109,6 @@ const App: React.FC = () => {
           </span>
           <Space>
             <Tag color={ROLE_COLOR[role]}>{userName || ROLE_OPTIONS.find((o) => o.value === role)?.label}</Tag>
-            <span style={{ fontSize: 13, color: '#666' }}>切换角色：</span>
-            <Select
-              size="small" value={role}
-              onChange={(v) => handleRoleChange(v)}
-              options={ROLE_OPTIONS}
-              style={{ width: 100 }}
-            />
             <Button
               type="text" danger icon={<LogoutOutlined />}
               onClick={handleLogout}
