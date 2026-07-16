@@ -85,8 +85,10 @@ const OrderList: React.FC<Props> = ({ mode }) => {
   const needsPolling = mode === 'student-own' || mode === 'runner-deliveries';
   useEffect(() => {
     if (!needsPolling) return;
-    const timer = setInterval(() => { fetchOrdersRef.current(); }, 5000);
-    return () => clearInterval(timer);
+    // Immediate first poll after 1s (in case initial fetch missed data)
+    const id1 = setTimeout(() => { fetchOrdersRef.current(); }, 1000);
+    const timer = setInterval(() => { fetchOrdersRef.current(); }, 2000);
+    return () => { clearTimeout(id1); clearInterval(timer); };
   }, [needsPolling]);
 
   const handleTableChange = (pag: { current?: number; pageSize?: number }) => {
