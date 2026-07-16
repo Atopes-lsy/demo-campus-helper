@@ -12,7 +12,7 @@ public final class StatusFlowValidator {
     static {
         Map<Integer, Set<Integer>> map = new HashMap<>();
         map.put(0, Set.of(1, 6));
-        map.put(1, Set.of(2, 6));
+        map.put(1, Set.of(2, 3, 6));  // runner can go to 取件中(legacy) or 配送中 directly
         map.put(2, Set.of(3));
         map.put(3, Set.of(4));
         map.put(4, Set.of(5));

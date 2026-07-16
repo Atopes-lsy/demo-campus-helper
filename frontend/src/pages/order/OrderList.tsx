@@ -108,16 +108,6 @@ const OrderList: React.FC<Props> = ({ mode }) => {
   };
 
   // ---- Runner actions ----
-  const handleGoPickup = async (id: number) => {
-    try {
-      await updateOrderStatus(id, { newStatus: 2, operatorId: userId, operatorType: 'RUNNER' });
-      message.success('已标记为前往取件');
-      fetchOrders();
-    } catch {
-      // error handled by interceptor
-    }
-  };
-
   const handlePickedUp = async (id: number) => {
     try {
       await updateOrderStatus(id, { newStatus: 3, operatorId: userId, operatorType: 'RUNNER' });
@@ -243,13 +233,8 @@ const OrderList: React.FC<Props> = ({ mode }) => {
 
           {/* Runner actions */}
           {mode === 'runner-deliveries' && record.status === 1 && (
-            <Popconfirm title="确认前往取件？" onConfirm={() => handleGoPickup(record.id)}>
-              <a style={{ color: '#1677ff' }}>前往取件</a>
-            </Popconfirm>
-          )}
-          {mode === 'runner-deliveries' && record.status === 2 && (
-            <Popconfirm title="确认已取到包裹？" onConfirm={() => handlePickedUp(record.id)}>
-              <a style={{ color: '#fa8c16' }}>已取件</a>
+            <Popconfirm title="确认已取件？" onConfirm={() => handlePickedUp(record.id)}>
+              <a style={{ color: '#1677ff' }}>已取件</a>
             </Popconfirm>
           )}
           {mode === 'runner-deliveries' && record.status === 3 && (

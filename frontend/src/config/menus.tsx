@@ -26,7 +26,6 @@ export const ROLE_MENUS: Record<ViewerRole, MenuItem[]> = {
     { key: '/runner/available', icon: <UnorderedListOutlined />, label: '可接订单' },
     { key: '/runner/deliveries', icon: <CarryOutOutlined />, label: '我的配送' },
     { key: '/runner/earnings', icon: <BarChartOutlined />, label: '收入统计' },
-    { key: '/runner/register', icon: <UserAddOutlined />, label: '跑腿员注册' },
     { key: '/ai/chat', icon: <RobotOutlined />, label: 'AI 助手' },
   ],
   ADMIN: [

@@ -33,8 +33,8 @@ interface TrackingRecord {
 
 const STATUS_STEPS = [
   { status: 0, title: '待接单' }, { status: 1, title: '已接单' },
-  { status: 2, title: '取件中' }, { status: 3, title: '配送中' },
-  { status: 4, title: '已送达' }, { status: 5, title: '已完成' },
+  { status: 3, title: '配送中' }, { status: 4, title: '已送达' },
+  { status: 5, title: '已完成' },
 ];
 
 const OrderDetail: React.FC = () => {
@@ -156,9 +156,8 @@ const OrderDetail: React.FC = () => {
       }
     }
     if (role === 'RUNNER') {
-      if (order.status === 1) buttons.push(<Button key="go" type="primary" loading={actionLoading} onClick={() => doAction(2, 'RUNNER', '前往取件')}>前往取件</Button>);
-      if (order.status === 2) buttons.push(<Popconfirm key="picked" title="已取到？" onConfirm={() => doAction(3, 'RUNNER', '配送中')}><Button type="primary" loading={actionLoading}>已取件，配送</Button></Popconfirm>);
-      if (order.status === 3) buttons.push(<Popconfirm key="deliver" title="已送达？" onConfirm={() => doAction(4, 'RUNNER', '已送达')}><Button type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={actionLoading}>确认送达</Button></Popconfirm>);
+      if (order.status === 1) buttons.push(<Popconfirm key="picked" title="确认已取件？" onConfirm={() => doAction(3, 'RUNNER', '已取件，配送中')}><Button type="primary" loading={actionLoading}>已取件，开始配送</Button></Popconfirm>);
+      if (order.status === 3) buttons.push(<Popconfirm key="deliver" title="确认已送达？" onConfirm={() => doAction(4, 'RUNNER', '已送达')}><Button type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={actionLoading}>确认送达</Button></Popconfirm>);
     }
     if (role === 'ADMIN' && order.status !== 5 && order.status !== 6) {
       buttons.push(<Popconfirm key="force" title="强制取消？" onConfirm={() => doAction(6, 'ADMIN', '已强制取消')}><Button danger loading={actionLoading}>强制取消</Button></Popconfirm>);
