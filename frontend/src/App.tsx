@@ -10,6 +10,7 @@ import TransactionList from './pages/transaction/TransactionList';
 import RegisterRunner from './pages/runner/RegisterRunner';
 import EarningsDashboard from './pages/runner/EarningsDashboard';
 import RunnerManagement from './pages/admin/RunnerManagement';
+import StudentManagement from './pages/admin/StudentManagement';
 import LoginPage from './pages/auth/LoginPage';
 import AIChat from './pages/ai/AIChat';
 import AnomalyList from './pages/ai/AnomalyList';
@@ -138,6 +139,7 @@ const App: React.FC = () => {
             <Route path="/admin/orders" element={<RoleGuard allowedRoles={['ADMIN']}><OrderList mode="admin-all" /></RoleGuard>} />
             <Route path="/admin/orders/:id" element={<RoleGuard allowedRoles={['ADMIN']}><OrderDetail /></RoleGuard>} />
             <Route path="/admin/runners" element={<RoleGuard allowedRoles={['ADMIN']}><RunnerManagement /></RoleGuard>} />
+            <Route path="/admin/students" element={<RoleGuard allowedRoles={['ADMIN']}><StudentManagement /></RoleGuard>} />
             <Route path="/admin/transactions" element={<RoleGuard allowedRoles={['ADMIN']}><TransactionList /></RoleGuard>} />
 
             {/* ======== Shared ======== */}

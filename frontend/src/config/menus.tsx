@@ -11,6 +11,7 @@ import {
   AlertOutlined,
   UserAddOutlined,
   BarChartOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import type { ViewerRole } from '../contexts/AuthContext';
 
@@ -31,6 +32,7 @@ export const ROLE_MENUS: Record<ViewerRole, MenuItem[]> = {
   ADMIN: [
     { key: '/admin/orders', icon: <OrderedListOutlined />, label: '全部订单' },
     { key: '/admin/runners', icon: <TeamOutlined />, label: '跑腿员管理' },
+    { key: '/admin/students', icon: <UserOutlined />, label: '学生用户管理' },
     { key: '/dashboard', icon: <DashboardOutlined />, label: '数据看板' },
     { key: '/admin/transactions', icon: <DollarOutlined />, label: '后台流水' },
     { key: '/ai/anomalies', icon: <AlertOutlined />, label: '异常预警' },
