@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.frontend/
+
+# Build output
+frontend/dist/
+backend/target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment (contains secrets)
+.env
+
+# Docker volumes
+mysql-data/
+redis-data/
+
+# Logs
+*.log

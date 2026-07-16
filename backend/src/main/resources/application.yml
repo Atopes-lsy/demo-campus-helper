@@ -1,0 +1,41 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/campus_helper?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: CampusHelper@2026!
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  websocket:
+    stomp:
+      heartbeat: 10000,10000
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+deepseek:
+  api:
+    key: ${DEEPSEEK_API_KEY:sk-placeholder}
+    url: https://api.deepseek.com/v1
+
+dispatch:
+  max-radius: 3000
+  min-score-threshold: 0.3
+  retry-interval: 600
+
+order:
+  timeout:
+    pending-minutes: 30
+    delivered-hours: 2
+
+anomaly:
+  ghost-runner-hours: 2
+  high-cancel-rate: 0.30
+  slow-delivery-multiplier: 2.0
