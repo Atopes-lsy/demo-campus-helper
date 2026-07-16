@@ -84,23 +84,7 @@ const OrderDetail: React.FC = () => {
   const reviewRef = useRef(checkReviewStatus);
   reviewRef.current = checkReviewStatus;
 
-  // Track status transitions with ref (no re-render on change)
-  const prevStatusRef = useRef<number | null>(null);
-
   useEffect(() => { fetchData(); checkReviewStatus(); }, [id]);
-
-  // Auto-open review modal when order transitions to status 5
-  useEffect(() => {
-    const prev = prevStatusRef.current;
-    if (role === 'STUDENT' && prev !== null && prev !== 5 && order?.status === 5 && !alreadyReviewed) {
-      const t = setTimeout(() => {
-        setReviewRating(5); setReviewContent(''); setReviewTags([]);
-        setReviewModalOpen(true);
-      }, 300);
-      return () => clearTimeout(t);
-    }
-    prevStatusRef.current = order?.status ?? null;
-  }, [order?.status, role, alreadyReviewed]);
 
   // Auto-refresh every 3s so student sees runner's status changes live
   useEffect(() => {
@@ -115,9 +99,14 @@ const OrderDetail: React.FC = () => {
     try {
       await updateOrderStatus(order.id, { newStatus, operatorId: userId, operatorType });
       await fetchData();
+
+      // Student just confirmed receipt — pop review modal directly
       if (newStatus === 5 && operatorType === 'STUDENT') {
         setAlreadyReviewed(false);
-        message.success('已确认收货');
+        setReviewRating(5);
+        setReviewContent('');
+        setReviewTags([]);
+        setReviewModalOpen(true);
       } else {
         message.success(successMsg);
       }
