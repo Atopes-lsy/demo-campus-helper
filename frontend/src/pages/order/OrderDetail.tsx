@@ -84,26 +84,22 @@ const OrderDetail: React.FC = () => {
   const reviewRef = useRef(checkReviewStatus);
   reviewRef.current = checkReviewStatus;
 
-  // Track the status we had before the last fetch — used to detect transitions
-  const [prevStatus, setPrevStatus] = useState<number | null>(null);
+  // Track status transitions with ref (no re-render on change)
+  const prevStatusRef = useRef<number | null>(null);
 
   useEffect(() => { fetchData(); checkReviewStatus(); }, [id]);
 
-  // Auto-open review modal when order transitions to status 5 (student confirmed receipt)
+  // Auto-open review modal when order transitions to status 5
   useEffect(() => {
-    if (role === 'STUDENT' && prevStatus !== null && prevStatus !== 5 && order?.status === 5 && !alreadyReviewed) {
-      // Short delay so any Popconfirm unmount finishes
+    const prev = prevStatusRef.current;
+    if (role === 'STUDENT' && prev !== null && prev !== 5 && order?.status === 5 && !alreadyReviewed) {
       const t = setTimeout(() => {
-        setReviewRating(5);
-        setReviewContent('');
-        setReviewTags([]);
+        setReviewRating(5); setReviewContent(''); setReviewTags([]);
         setReviewModalOpen(true);
-      }, 100);
+      }, 300);
       return () => clearTimeout(t);
     }
-    if (order?.status !== undefined && order.status !== prevStatus) {
-      setPrevStatus(order.status);
-    }
+    prevStatusRef.current = order?.status ?? null;
   }, [order?.status, role, alreadyReviewed]);
 
   // Auto-refresh every 3s so student sees runner's status changes live
