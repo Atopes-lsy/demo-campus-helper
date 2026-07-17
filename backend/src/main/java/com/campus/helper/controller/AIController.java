@@ -9,6 +9,7 @@ import com.campus.helper.mapper.AIChatHistoryMapper;
 import com.campus.helper.mapper.AnomalyAlertMapper;
 import com.campus.helper.service.AIChatService;
 import com.campus.helper.service.AnomalyDetector;
+import com.campus.helper.service.DeliveryMatrixService;
 import com.campus.helper.service.SmartPricingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -24,19 +25,30 @@ public class AIController {
     private final AIChatService aiChatService;
     private final SmartPricingService smartPricingService;
     private final AnomalyDetector anomalyDetector;
+    private final DeliveryMatrixService deliveryMatrixService;
     private final AnomalyAlertMapper anomalyAlertMapper;
     private final AIChatHistoryMapper aiChatHistoryMapper;
 
+    /**
+     * AI chat — ADMIN only. Supports tunable temperature and style.
+     * Optional params: temperature (0.1~0.9, default 0.5), style ("precise"/"concise"/"detailed", default "detailed")
+     */
     @PostMapping("/chat")
     public Result chat(@RequestBody Map<String, Object> body) {
         Long userId = body.get("userId") != null
                 ? ((Number) body.get("userId")).longValue() : 1L;
         String userType = body.get("userType") != null
-                ? (String) body.get("userType") : "STUDENT";
+                ? (String) body.get("userType") : "ADMIN";
         String sessionId = (String) body.get("sessionId");
         String message = (String) body.get("message");
 
-        String reply = aiChatService.chat(userId, userType, sessionId, message);
+        // Optional tuning params
+        double temperature = body.get("temperature") != null
+                ? ((Number) body.get("temperature")).doubleValue() : 0.5;
+        String style = body.get("style") != null
+                ? (String) body.get("style") : "detailed";
+
+        String reply = aiChatService.chat(userId, userType, sessionId, message, temperature, style);
         return Result.success(Map.of("reply", reply, "sessionId", sessionId));
     }
 
@@ -50,9 +62,26 @@ public class AIController {
         return Result.success(list);
     }
 
+    /**
+     * Get the full delivery distance matrix.
+     */
+    @GetMapping("/matrix")
+    public Result getMatrix() {
+        return Result.success(deliveryMatrixService.getMatrixOverview());
+    }
+
+    /**
+     * Manually refresh the delivery distance matrix.
+     */
+    @PostMapping("/matrix/refresh")
+    public Result refreshMatrix() {
+        deliveryMatrixService.refreshMatrix();
+        return Result.success(Map.of("message", "配送矩阵刷新完成"));
+    }
+
     @GetMapping("/pricing/suggest/{orderId}")
     public Result getPricingSuggest(@PathVariable Long orderId) {
-        Object suggestion = smartPricingService.getAISuggestion();
+        Object suggestion = smartPricingService.getAISuggestion(orderId);
         return Result.success(suggestion);
     }
 

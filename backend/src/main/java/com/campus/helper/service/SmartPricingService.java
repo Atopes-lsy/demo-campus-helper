@@ -10,6 +10,8 @@ import com.campus.helper.entity.Runner;
 import com.campus.helper.mapper.OrderMapper;
 import com.campus.helper.mapper.PricingRuleMapper;
 import com.campus.helper.mapper.RunnerMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,7 @@ public class SmartPricingService {
     private final DeepSeekClient deepSeekClient;
     private final OrderMapper orderMapper;
     private final RunnerMapper runnerMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Estimate the delivery price based on distance and time slot, applying
@@ -59,16 +62,62 @@ public class SmartPricingService {
             }
 
             if ("TIME".equals(rule.getConditionType())) {
-                // TIME rules: apply only if conditionExpr matches the given timeSlot
+                // TIME rules: conditionExpr is JSON like {"slots":[2,4]} or just an integer
                 try {
-                    int ruleSlot = Integer.parseInt(rule.getConditionExpr());
-                    if (ruleSlot == timeSlot) {
+                    if (rule.getConditionExpr().startsWith("{")) {
+                        // Parse JSON format: {"slots":[2,4]}
+                        JsonNode node = objectMapper.readTree(rule.getConditionExpr());
+                        JsonNode slotsNode = node.get("slots");
+                        if (slotsNode != null && slotsNode.isArray()) {
+                            for (JsonNode slot : slotsNode) {
+                                if (slot.asInt() == timeSlot) {
+                                    factors.put(rule.getName(), rule.getPriceFactor());
+                                    product = product.multiply(rule.getPriceFactor());
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        // Plain integer format
+                        int ruleSlot = Integer.parseInt(rule.getConditionExpr());
+                        if (ruleSlot == timeSlot) {
+                            factors.put(rule.getName(), rule.getPriceFactor());
+                            product = product.multiply(rule.getPriceFactor());
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse conditionExpr '{}' for TIME rule '{}': {}",
+                            rule.getConditionExpr(), rule.getName(), e.getMessage());
+                }
+            } else if ("DISTANCE".equals(rule.getConditionType())) {
+                // DISTANCE rules: conditionExpr is JSON like {"distance_gt":1000}
+                try {
+                    JsonNode node = objectMapper.readTree(rule.getConditionExpr());
+                    JsonNode distNode = node.get("distance_gt");
+                    if (distNode != null && distanceMeters > distNode.asDouble()) {
                         factors.put(rule.getName(), rule.getPriceFactor());
                         product = product.multiply(rule.getPriceFactor());
                     }
-                } catch (NumberFormatException e) {
-                    log.warn("Invalid conditionExpr '{}' for TIME pricing rule '{}'",
-                            rule.getConditionExpr(), rule.getName());
+                } catch (Exception e) {
+                    log.warn("Failed to parse conditionExpr '{}' for DISTANCE rule '{}': {}",
+                            rule.getConditionExpr(), rule.getName(), e.getMessage());
+                }
+            } else if ("DEMAND".equals(rule.getConditionType())) {
+                // DEMAND rules: conditionExpr is JSON like {"pending_gt":20}
+                try {
+                    JsonNode node = objectMapper.readTree(rule.getConditionExpr());
+                    JsonNode pendingNode = node.get("pending_gt");
+                    if (pendingNode != null) {
+                        Long pendingOrders = orderMapper.selectCount(
+                                new LambdaQueryWrapper<Order>().eq(Order::getStatus, 0));
+                        if (pendingOrders > pendingNode.asLong()) {
+                            factors.put(rule.getName(), rule.getPriceFactor());
+                            product = product.multiply(rule.getPriceFactor());
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse conditionExpr '{}' for DEMAND rule '{}': {}",
+                            rule.getConditionExpr(), rule.getName(), e.getMessage());
                 }
             } else if ("GLOBAL".equals(rule.getConditionType())) {
                 // GLOBAL rules: apply to all orders
@@ -90,32 +139,40 @@ public class SmartPricingService {
     }
 
     /**
-     * Get AI-powered pricing suggestion based on current platform supply/demand.
-     * Queries pending order count and online runner count, then calls DeepSeek.
+     * Get AI-powered pricing suggestion for a specific order, based on
+     * current platform supply/demand.
      *
+     * @param orderId the order to get pricing suggestion for
      * @return AI-generated pricing suggestion string
      */
-    public String getAISuggestion() {
-        // Count pending orders (status=0)
+    public String getAISuggestion(Long orderId) {
+        // Queries pending order count and online runner count
         Long pendingOrders = orderMapper.selectCount(
                 new LambdaQueryWrapper<Order>().eq(Order::getStatus, 0)
         );
 
-        // Count online (free) runners (status=0)
         Long onlineRunners = runnerMapper.selectCount(
                 new LambdaQueryWrapper<Runner>().eq(Runner::getStatus, 0)
         );
 
-        // Build context for AI
+        // Build context with order info if available
         StringBuilder context = new StringBuilder();
         context.append("当前待接单数：").append(pendingOrders).append("\n");
         context.append("当前在线跑腿员数：").append(onlineRunners).append("\n");
 
-        String contextStr = context.toString();
-        log.info("Pricing advisor context: pendingOrders={}, onlineRunners={}",
-                pendingOrders, onlineRunners);
+        if (orderId != null) {
+            Order order = orderMapper.selectById(orderId);
+            if (order != null) {
+                context.append("订单取货点：").append(order.getPickupLocation()).append("\n");
+                context.append("订单送达点：").append(order.getDeliveryLocation()).append("\n");
+                context.append("订单金额：").append(order.getAmount()).append("\n");
+            }
+        }
 
-        // Call DeepSeek with pricing advisor prompt (low temperature for consistency)
+        String contextStr = context.toString();
+        log.info("Pricing advisor context: pendingOrders={}, onlineRunners={}, orderId={}",
+                pendingOrders, onlineRunners, orderId);
+
         String suggestion = deepSeekClient.chat(PromptTemplates.PRICING_ADVISOR, contextStr, 0.3);
         log.info("AI pricing suggestion: {}", suggestion);
         return suggestion;

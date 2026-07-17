@@ -32,11 +32,19 @@ const RegisterRunner: React.FC = () => {
   return (
     <div style={{
       display: 'flex', justifyContent: 'center', alignItems: 'center',
-      minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      minHeight: '100vh', background: '#E9EEEA',
     }}>
       <Card
-        title={<div style={{ textAlign: 'center', fontSize: 20 }}>注册成为跑腿员</div>}
-        style={{ width: 420, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}
+        title={<div style={{ textAlign: 'center' }}>
+          <img
+            src="/campus-helper-logo.png"
+            alt="校园帮帮"
+            style={{ height: 64, width: 64, objectFit: 'contain', marginBottom: -4 }}
+          />
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#4A7C59', letterSpacing: 1 }}>注册成为跑腿员</div>
+        </div>}
+        style={{ width: 420, borderRadius: 16, border: '1px solid #E0E8E2',
+          boxShadow: '0 8px 32px rgba(23, 24, 28, 0.08), 0 2px 8px rgba(23, 24, 28, 0.04)' }}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item name="name" label="姓名"
@@ -66,7 +74,7 @@ const RegisterRunner: React.FC = () => {
           </Form.Item>
 
           <div style={{ textAlign: 'center' }}>
-            <a onClick={() => navigate('/login')}>已有账号？返回登录</a>
+            <a onClick={() => navigate('/login')} style={{ color: '#5B8C6B' }}>已有账号？返回登录</a>
           </div>
         </Form>
       </Card>

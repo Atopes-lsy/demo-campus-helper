@@ -4,9 +4,9 @@ import dayjs from 'dayjs';
 import { getAnomalies, resolveAnomaly, triggerAnomalyScan } from '../../api/ai';
 
 const SEVERITY_MAP: Record<number, { label: string; color: string }> = {
-  1: { label: '低', color: 'green' },
-  2: { label: '中', color: 'orange' },
-  3: { label: '高', color: 'red' },
+  1: { label: '低', color: '#7CB88B' },
+  2: { label: '中', color: '#E8A648' },
+  3: { label: '高', color: '#D96C6C' },
 };
 
 interface AnomalyRecord {
@@ -117,9 +117,9 @@ const AnomalyList: React.FC = () => {
       width: 100,
       render: (val: number) =>
         val === 0 ? (
-          <Tag color="yellow">未处理</Tag>
+          <Tag color="#E8A648">未处理</Tag>
         ) : (
-          <Tag color="green">已处理</Tag>
+          <Tag color="#5B8C6B">已处理</Tag>
         ),
     },
     {

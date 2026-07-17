@@ -1,8 +1,6 @@
 package com.campus.helper.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.campus.helper.ai.DeepSeekClient;
-import com.campus.helper.ai.PromptTemplates;
 import com.campus.helper.entity.AIChatHistory;
 import com.campus.helper.mapper.AIChatHistoryMapper;
 import lombok.RequiredArgsConstructor;
@@ -13,68 +11,53 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * AI chat service — ADMIN-only access.
+ * Student and runner AI functionality has been removed.
+ * All admin AI logic is delegated to {@link AdminAIService}.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AIChatService {
 
-    private final DeepSeekClient deepSeekClient;
+    private final AdminAIService adminAIService;
     private final AIChatHistoryMapper aiChatHistoryMapper;
 
     /**
-     * Chat with the AI assistant, maintaining context from the conversation history.
-     * Loads the last 10 message pairs (20 rows) from the same session as context.
+     * Chat entry point. Only ADMIN users are served; others receive a rejection message.
      *
-     * @param userId    the user's ID
-     * @param userType  the user type ("STUDENT" or "RUNNER")
-     * @param sessionId the chat session identifier
-     * @param message   the user's message
-     * @return the AI assistant's reply
+     * @param userId      the user's ID
+     * @param userType    the user type — must be "ADMIN"
+     * @param sessionId   the chat session identifier
+     * @param message     the user's message
+     * @param temperature AI temperature (0.1~0.9), default 0.5
+     * @param style       response style: "precise" | "concise" | "detailed", default "detailed"
+     * @return the AI assistant's reply, or an access-denied message
      */
-    public String chat(Long userId, String userType, String sessionId, String message) {
-        // Save user message to history
-        AIChatHistory userMsg = new AIChatHistory();
-        userMsg.setSessionId(sessionId);
-        userMsg.setUserId(userId);
-        userMsg.setUserType(userType);
-        userMsg.setRole("user");
-        userMsg.setContent(message);
-        userMsg.setCreatedAt(LocalDateTime.now());
-        aiChatHistoryMapper.insert(userMsg);
+    public String chat(Long userId, String userType, String sessionId, String message,
+                       double temperature, String style) {
+        if (!"ADMIN".equalsIgnoreCase(userType)) {
+            return "AI 助手仅对管理员开放。如有问题请联系管理员处理。";
+        }
 
-        // Load last 10 messages (20 rows: user + assistant) from same session
-        List<AIChatHistory> recentHistory = aiChatHistoryMapper.selectList(
+        double temp = Math.max(0.1, Math.min(0.9, temperature));
+        String actualStyle = (style != null && !style.isEmpty()) ? style : "detailed";
+
+        return adminAIService.adminChat(userId, sessionId, message, temp, actualStyle);
+    }
+
+    /**
+     * Load chat history for a given session.
+     */
+    public List<AIChatHistory> getHistory(String sessionId) {
+        List<AIChatHistory> history = aiChatHistoryMapper.selectList(
                 new LambdaQueryWrapper<AIChatHistory>()
                         .eq(AIChatHistory::getSessionId, sessionId)
-                        .orderByDesc(AIChatHistory::getId)
-                        .last("LIMIT 20")
+                        .orderByAsc(AIChatHistory::getCreatedAt)
         );
-        // Reverse to chronological order for context building
-        Collections.reverse(recentHistory);
-
-        // Build context string from history + current message
-        StringBuilder contextBuilder = new StringBuilder();
-        for (AIChatHistory h : recentHistory) {
-            contextBuilder.append(h.getRole()).append(": ").append(h.getContent()).append("\n");
-        }
-        String context = contextBuilder.toString();
-        log.debug("Chat context for session {}: {} characters from {} history rows",
-                sessionId, context.length(), recentHistory.size());
-
-        // Call DeepSeek AI
-        String reply = deepSeekClient.chat(PromptTemplates.CUSTOMER_SERVICE, context, 0.7);
-
-        // Save assistant response to history
-        AIChatHistory assistantMsg = new AIChatHistory();
-        assistantMsg.setSessionId(sessionId);
-        assistantMsg.setUserId(userId);
-        assistantMsg.setUserType(userType);
-        assistantMsg.setRole("assistant");
-        assistantMsg.setContent(reply);
-        assistantMsg.setCreatedAt(LocalDateTime.now());
-        aiChatHistoryMapper.insert(assistantMsg);
-
-        log.info("Chat completed for session {}: user={}, reply length={}", sessionId, userId, reply.length());
-        return reply;
+        // Reverse to chronological order
+        Collections.reverse(history);
+        return history;
     }
 }

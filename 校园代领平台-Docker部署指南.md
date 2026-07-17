@@ -124,4 +124,4 @@ docker compose logs mysql | grep "ready for connections"
 后端刚启动需要约 10 秒完成初始化，等待后刷新页面即可。
 
 ### DeepSeek API 不可用
-AI 助手、智能定价、异常分析功能需要有效的 DeepSeek API Key。不影响订单核心流程。
+管理员 AI 助手、智能定价、异常分析功能需要有效的 DeepSeek API Key。不影响订单核心流程。

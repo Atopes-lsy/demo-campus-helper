@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Table, Button, Select, Tag, Space, Card, message, Popconfirm } from 'antd';
-import { StopOutlined, CheckOutlined } from '@ant-design/icons';
+import { Table, Button, Select, Tag, Space, Card, message, Switch } from 'antd';
 import dayjs from 'dayjs';
 import { getStudents, updateStudent } from '../../api/student';
 
@@ -40,11 +39,11 @@ const StudentManagement: React.FC = () => {
 
   useEffect(() => { fetchStudents(); }, [fetchStudents]);
 
-  const handleToggleStatus = async (record: StudentRecord) => {
-    const newStatus = record.status === 0 ? 1 : 0;
+  const handleToggleStatus = async (record: StudentRecord, checked: boolean) => {
+    const newStatus = checked ? 1 : 0;
     try {
       await updateStudent(record.id, { status: newStatus });
-      message.success(newStatus === 0 ? '已禁用' : '已启用');
+      message.success(checked ? '已启用' : '已禁用');
       fetchStudents();
     } catch { }
   };
@@ -64,16 +63,14 @@ const StudentManagement: React.FC = () => {
       render: (val: string) => val ? dayjs(val).format('YYYY-MM-DD HH:mm') : '—',
     },
     {
-      title: '操作', key: 'actions', width: 100, fixed: 'right' as const,
+      title: '操作', key: 'actions', width: 80, fixed: 'right' as const,
       render: (_: unknown, record: StudentRecord) => (
-        <Popconfirm
-          title={record.status === 0 ? '确认启用？' : '确认禁用？'}
-          onConfirm={() => handleToggleStatus(record)}
-        >
-          <a style={{ color: record.status === 0 ? 'green' : 'red' }}>
-            {record.status === 0 ? <><CheckOutlined /> 启用</> : <><StopOutlined /> 禁用</>}
-          </a>
-        </Popconfirm>
+        <Switch
+          checked={record.status !== 0}
+          checkedChildren="启用"
+          unCheckedChildren="禁用"
+          onChange={(checked) => handleToggleStatus(record, checked)}
+        />
       ),
     },
   ];

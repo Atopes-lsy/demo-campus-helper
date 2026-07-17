@@ -53,7 +53,7 @@ const EarningsDashboard: React.FC = () => {
   }
 
   if (!data) {
-    return <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>暂无数据</div>;
+    return <div style={{ textAlign: 'center', padding: 80, color: '#768E7D' }}>暂无数据</div>;
   }
 
   const recentColumns = [
@@ -68,7 +68,7 @@ const EarningsDashboard: React.FC = () => {
       dataIndex: 'amount',
       key: 'amount',
       width: 120,
-      render: (val: number) => <span style={{ fontWeight: 600, color: '#1677ff' }}>¥{val?.toFixed(2)}</span>,
+      render: (val: number) => <span style={{ fontWeight: 600, color: '#5B8C6B' }}>¥{val?.toFixed(2)}</span>,
     },
     {
       title: '完成时间',
@@ -83,7 +83,7 @@ const EarningsDashboard: React.FC = () => {
     <div>
       <h2 style={{ marginBottom: 16 }}>
         {data.runnerName} — 收入统计
-        <Tag color="gold" style={{ marginLeft: 12 }}>
+        <Tag color="#E8A648" style={{ marginLeft: 12 }}>
           <StarOutlined /> {data.rating?.toFixed(1)}
         </Tag>
       </h2>
@@ -118,7 +118,7 @@ const EarningsDashboard: React.FC = () => {
               precision={2}
               prefix={<RiseOutlined />}
               suffix="元"
-              valueStyle={{ color: '#3f8600' }}
+              valueStyle={{ color: '#3D6B4A' }}
             />
           </Card>
         </Col>

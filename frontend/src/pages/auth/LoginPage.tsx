@@ -186,15 +186,33 @@ const LoginPage: React.FC = () => {
   ];
 
   return (
-    <div style={{
-      display: 'flex', justifyContent: 'center', alignItems: 'center',
-      minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: '#E9EEEA',
+      }}
+    >
       <Card
-        style={{ width: 420, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}
+        style={{
+          width: 420,
+          borderRadius: 16,
+          boxShadow:
+            '0 8px 32px rgba(23, 24, 28, 0.08), 0 2px 8px rgba(23, 24, 28, 0.04)',
+          border: '1px solid #E0E8E2',
+        }}
         title={
-          <div style={{ textAlign: 'center', fontSize: 24, fontWeight: 700, color: '#1677ff' }}>
-            校园帮帮
+          <div style={{ textAlign: 'center' }}>
+            <img
+              src="/campus-helper-logo.png"
+              alt="校园帮帮"
+              style={{ height: 72, width: 72, objectFit: 'contain', marginBottom: -4 }}
+            />
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#4A7C59', letterSpacing: 1 }}>
+              校园帮帮
+            </div>
           </div>
         }
       >

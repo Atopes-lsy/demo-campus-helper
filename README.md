@@ -1,6 +1,6 @@
 # 校园帮帮 — 代领外卖/包裹平台
 
-前后端分离的校园代领平台，支持外卖和包裹的代取配送。三角色（学生/跑腿员/管理员）完全隔离，含完整订单生命周期、评分系统、收入统计、后台管理和 AI 助手。
+前后端分离的校园代领平台，支持外卖和包裹的代取配送。三角色（学生/跑腿员/管理员）完全隔离，含完整订单生命周期、评分系统、收入统计、后台管理和管理员 AI 数据分析助手。
 
 ## 快速启动（Docker）
 
@@ -65,7 +65,7 @@ docker compose up -d mysql redis
 - 📈 **数据看板** — 今日订单/在线跑腿员/完成率/收入四大指标
 - 💳 **后台流水** — 订单创建自动生成支付记录
 - 🚨 **异常预警** — 幽灵跑腿员检测、高取消率检测，支持手动触发扫描
-- 🤖 **AI 助手** — DeepSeek 智能客服，所有页面右下角悬浮球一键调用
+- 🤖 **AI 助手** — 管理员专属，基于 DeepSeek 的数据分析助手，支持运营决策问答、配送距离矩阵查询、跑腿员效率分析
 - 🔄 **实时状态刷新** — 学生/跑腿员端自动轮询，第一时间看到订单状态变更
 - 📍 **预估送达时间** — 创建时间+30分钟，超时标红提醒
 
@@ -82,13 +82,13 @@ campus-helper/
 │   ├── pom.xml
 │   └── src/main/java/com/campus/helper/
 │       ├── controller/             # 9个REST控制器
-│       ├── service/                # 7个业务服务
-│       ├── entity/                 # 10个实体类
+│       ├── service/                # 9个业务服务
+│       ├── entity/                 # 11个实体类
 │       ├── mapper/                 # MyBatis-Plus Mapper
 │       ├── dto/                    # 请求/响应DTO
 │       ├── config/                 # CORS/MyBatis/WebSocket配置
 │       ├── common/                 # 统一响应/异常/状态流
-│       ├── ai/                     # DeepSeek客户端
+│       ├── ai/                     # DeepSeek客户端+Prompt模板+管理员工具定义
 │       ├── scheduler/              # 定时任务
 │       └── websocket/              # 实时推送
 └── frontend/                       # React 18 + TypeScript + Ant Design 5
@@ -101,7 +101,7 @@ campus-helper/
         │   ├── admin/              # 管理员(跑腿员管理/学生管理)
         │   ├── transaction/        # 后台流水
         │   ├── dashboard/          # 数据看板
-        │   └── ai/                 # AI对话/异常预警
+        │   └── ai/                 # 管理员AI对话/异常预警
         ├── api/                    # API请求层(9个模块)
         ├── contexts/               # AuthContext
         ├── components/             # RoleGuard
@@ -115,7 +115,7 @@ campus-helper/
 | 前端 | React 18, TypeScript, Ant Design 5, Vite 6 |
 | 后端 | Spring Boot 3.3, MyBatis-Plus 3.5, WebSocket |
 | 数据库 | MySQL 8.0, Redis 7 (Redisson) |
-| AI | DeepSeek-V3 |
+| AI | DeepSeek-V3（管理员数据分析） |
 | 部署 | Docker Compose, Nginx |
 
 ## 文档

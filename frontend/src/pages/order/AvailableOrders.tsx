@@ -85,7 +85,7 @@ const AvailableOrders: React.FC = () => {
       const pkgs = JSON.parse(packagesJson) as { size: string }[];
       const labels: Record<string, string> = { small: '小件', medium: '中件', large: '大件' };
       return pkgs.map((p, i) => (
-        <Tag key={i} color="blue">
+        <Tag key={i} color="#87A8D0">
           {labels[p.size] || p.size}
         </Tag>
       ));
@@ -160,7 +160,7 @@ const AvailableOrders: React.FC = () => {
         <Space>
           <a onClick={() => navigate(`/runner/orders/${record.id}`)}>详情</a>
           <Popconfirm title="确认接单？" onConfirm={() => handleAccept(record.id)}>
-            <a style={{ color: '#1677ff', fontWeight: 600 }}>接单</a>
+            <Button type="primary" size="small" style={{ background: '#5B8C6B', borderColor: '#5B8C6B' }}>接单</Button>
           </Popconfirm>
         </Space>
       ),
@@ -183,7 +183,7 @@ const AvailableOrders: React.FC = () => {
             刷新
           </Button>
         </Space>
-        <Tag color="blue">{pagination.total} 个待接订单</Tag>
+        <Tag color="#5B8C6B">{pagination.total} 个待接订单</Tag>
       </div>
       <Table
         rowKey="id"

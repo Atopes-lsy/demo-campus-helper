@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Table, Button, Select, Tag, Space, Card, message, Popconfirm,
-  Modal, Form, Input, InputNumber,
+  Table, Button, Select, Tag, Space, Card, message,
+  Modal, Form, Input, InputNumber, Switch, Tooltip,
 } from 'antd';
-import { PlusOutlined, EditOutlined, StopOutlined, CheckOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getRunners, updateRunner, createRunner } from '../../api/runner';
 import { RUNNER_STATUS_MAP } from '../../utils/dict';
@@ -116,17 +116,15 @@ const RunnerManagement: React.FC = () => {
     }
   };
 
-  // ---- Toggle status (activate/deactivate) ----
-  const handleToggleStatus = async (record: RunnerRecord) => {
-    const newStatus = record.status === 2 ? 0 : 2; // toggle rest ↔ idle
-    const actionLabel = newStatus === 2 ? '停用' : '启用';
+  // ---- Toggle status (enable/disable) ----
+  const handleToggleStatus = async (record: RunnerRecord, checked: boolean) => {
+    const newStatus = checked ? 0 : 2; // checked → idle, unchecked → rest
+    const actionLabel = checked ? '启用' : '停用';
     try {
       await updateRunner(record.id, { status: newStatus } as unknown as Record<string, unknown>);
       message.success(`${actionLabel}成功`);
       fetchRunners();
-    } catch {
-      // error handled by interceptor
-    }
+    } catch { }
   };
 
   const columns = [
@@ -190,23 +188,28 @@ const RunnerManagement: React.FC = () => {
       key: 'actions',
       width: 160,
       fixed: 'right' as const,
-      render: (_: unknown, record: RunnerRecord) => (
-        <Space>
-          <a onClick={() => openEditModal(record)}>
-            <EditOutlined /> 编辑
-          </a>
-          {record.status !== 1 && (
-            <Popconfirm
-              title={record.status === 2 ? '确认启用该跑腿员？' : '确认停用该跑腿员？'}
-              onConfirm={() => handleToggleStatus(record)}
-            >
-              <a style={{ color: record.status === 2 ? 'green' : 'red' }}>
-                {record.status === 2 ? <><CheckOutlined /> 启用</> : <><StopOutlined /> 停用</>}
-              </a>
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+      render: (_: unknown, record: RunnerRecord) => {
+        const canToggle = record.status !== 1;
+        return (
+          <Space>
+            <a onClick={() => openEditModal(record)}>
+              <EditOutlined /> 编辑
+            </a>
+            {canToggle ? (
+              <Switch
+                checked={record.status === 0}
+                checkedChildren="启用"
+                unCheckedChildren="停用"
+                onChange={(checked) => handleToggleStatus(record, checked)}
+              />
+            ) : (
+              <Tooltip title="接单中，暂不可操作">
+                <Switch checked disabled />
+              </Tooltip>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 

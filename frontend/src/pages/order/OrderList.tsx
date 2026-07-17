@@ -262,7 +262,7 @@ const OrderList: React.FC<Props> = ({ mode }) => {
         if (!record.createdAt) return '—';
         const estimated = dayjs(record.createdAt).add(30, 'minute');
         const isLate = record.status < 5 && dayjs().isAfter(estimated);
-        return <span style={{ color: isLate ? 'red' : undefined, fontWeight: isLate ? 600 : undefined }}>
+        return <span style={{ color: isLate ? '#D96C6C' : undefined, fontWeight: isLate ? 600 : undefined }}>
           {estimated.format('MM-DD HH:mm')}{isLate ? ' ⚠' : ''}
         </span>;
       },
@@ -286,16 +286,16 @@ const OrderList: React.FC<Props> = ({ mode }) => {
           {/* Student actions */}
           {mode === 'student-own' && record.status === 0 && (
             <Popconfirm title="确定取消该订单？" onConfirm={() => handleCancel(record.id)}>
-              <a style={{ color: 'red' }}>取消</a>
+              <a style={{ color: '#D96C6C' }}>取消</a>
             </Popconfirm>
           )}
           {mode === 'student-own' && record.status === 4 && (
             <Popconfirm title="确认收货？" onConfirm={() => handleConfirmReceipt(record.id)}>
-              <a style={{ color: 'green' }}>确认收货</a>
+              <a style={{ color: '#5B8C6B' }}>确认收货</a>
             </Popconfirm>
           )}
           {mode === 'student-own' && record.status === 5 && !reviewedIds.current.has(record.id) && (
-            <a style={{ color: '#faad14', fontWeight: 600 }}
+            <a style={{ color: '#E8A648', fontWeight: 600 }}
                onClick={() => handleOpenReview(record.id)}>
               <StarOutlined /> 评分
             </a>
@@ -304,19 +304,19 @@ const OrderList: React.FC<Props> = ({ mode }) => {
           {/* Runner actions */}
           {mode === 'runner-deliveries' && record.status === 1 && (
             <Popconfirm title="确认已取件？" onConfirm={() => handlePickedUp(record.id)}>
-              <a style={{ color: '#1677ff' }}>待取件</a>
+              <a style={{ color: '#5B8C6B' }}>待取件</a>
             </Popconfirm>
           )}
           {mode === 'runner-deliveries' && record.status === 3 && (
             <Popconfirm title="确认已送达？" onConfirm={() => handleDelivered(record.id)}>
-              <a style={{ color: 'green' }}>已送达</a>
+              <a style={{ color: '#3D6B4A' }}>已送达</a>
             </Popconfirm>
           )}
 
           {/* Admin actions */}
           {mode === 'admin-all' && record.status !== 5 && record.status !== 6 && (
             <Popconfirm title="强制取消该订单？" onConfirm={() => handleForceCancel(record.id)}>
-              <a style={{ color: 'red' }}>强制取消</a>
+              <a style={{ color: '#D96C6C' }}>强制取消</a>
             </Popconfirm>
           )}
         </Space>
@@ -401,7 +401,7 @@ const OrderList: React.FC<Props> = ({ mode }) => {
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
           <div style={{ marginBottom: 8, fontWeight: 600 }}>评分</div>
           <Rate value={reviewRating} onChange={setReviewRating} style={{ fontSize: 32 }} />
-          <div style={{ color: '#999', marginTop: 4 }}>{['', '很差', '较差', '一般', '较好', '非常好'][reviewRating]}</div>
+          <div style={{ color: '#768E7D', marginTop: 4 }}>{['', '很差', '较差', '一般', '较好', '非常好'][reviewRating]}</div>
         </div>
         <div style={{ marginBottom: 16 }}>
           <div style={{ marginBottom: 8, fontWeight: 600 }}>快捷标签</div>

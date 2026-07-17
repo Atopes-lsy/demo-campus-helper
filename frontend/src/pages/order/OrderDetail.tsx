@@ -171,12 +171,12 @@ const OrderDetail: React.FC = () => {
         );
       }
       if (order.status === 5 && alreadyReviewed) {
-        buttons.push(<Tag key="done" color="green">已评价 ✓</Tag>);
+        buttons.push(<Tag key="done" color="#5B8C6B">已评价 ✓</Tag>);
       }
     }
     if (role === 'RUNNER') {
       if (order.status === 1) buttons.push(<Popconfirm key="picked" title="确认已取件？" onConfirm={() => doAction(3, 'RUNNER', '已取件，配送中')}><Button type="primary" loading={actionLoading}>待取件，开始配送</Button></Popconfirm>);
-      if (order.status === 3) buttons.push(<Popconfirm key="deliver" title="确认已送达？" onConfirm={() => doAction(4, 'RUNNER', '已送达')}><Button type="primary" style={{ background: '#52c41a', borderColor: '#52c41a' }} loading={actionLoading}>确认送达</Button></Popconfirm>);
+      if (order.status === 3) buttons.push(<Popconfirm key="deliver" title="确认已送达？" onConfirm={() => doAction(4, 'RUNNER', '已送达')}><Button type="primary" style={{ background: '#3D6B4A', borderColor: '#3D6B4A' }} loading={actionLoading}>确认送达</Button></Popconfirm>);
     }
     if (role === 'ADMIN' && order.status !== 5 && order.status !== 6) {
       buttons.push(<Popconfirm key="force" title="强制取消？" onConfirm={() => doAction(6, 'ADMIN', '已强制取消')}><Button danger loading={actionLoading}>强制取消</Button></Popconfirm>);
@@ -210,7 +210,7 @@ const OrderDetail: React.FC = () => {
       )}
 
       {actionButtons.length > 0 && (
-        <Card size="small" style={{ marginBottom: 16, background: '#f6ffed' }}>
+        <Card size="small" style={{ marginBottom: 16, background: '#F2F6F3' }}>
           <Space size="middle">
             <span style={{ fontWeight: 600, fontSize: 14 }}>当前可操作：</span>
             {actionButtons}
@@ -234,7 +234,7 @@ const OrderDetail: React.FC = () => {
             {packages.length > 0 ? (
               <Space wrap>{packages.map((pkg, idx) => {
                 const info = PACKAGE_SIZE_MAP[pkg.size];
-                return <Tag key={idx} color="blue">包裹{idx + 1}：{info ? `${info.label}（${info.size}）¥${info.price}` : pkg.size}</Tag>;
+                return <Tag key={idx} color="#87A8D0">包裹{idx + 1}：{info ? `${info.label}（${info.size}）¥${info.price}` : pkg.size}</Tag>;
               })}</Space>
             ) : '—'}
           </Descriptions.Item>
@@ -244,14 +244,14 @@ const OrderDetail: React.FC = () => {
               (() => {
                 const estimated = dayjs(order.createdAt).add(30, 'minute');
                 const isLate = order.status < 5 && dayjs().isAfter(estimated);
-                return <span style={{ color: isLate ? 'red' : undefined, fontWeight: isLate ? 600 : undefined }}>
+                return <span style={{ color: isLate ? '#D96C6C' : undefined, fontWeight: isLate ? 600 : undefined }}>
                   {estimated.format('HH:mm')}{isLate ? ' (可能超时)' : ''}
                 </span>;
               })()
             ) : '—'}
           </Descriptions.Item>
           <Descriptions.Item label="取件码">
-            {canSeePickupCode ? (order.pickupCode || '—') : <span style={{ color: '#999' }}>接单后可见</span>}
+            {canSeePickupCode ? (order.pickupCode || '—') : <span style={{ color: '#768E7D' }}>接单后可见</span>}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -259,8 +259,8 @@ const OrderDetail: React.FC = () => {
       <Card title="订单追踪">
         {tracking.length > 0 ? (
           <Timeline items={tracking.map((r) => ({
-            children: <div><div>{r.description}</div><div style={{ color: '#999', fontSize: 12 }}>{dayjs(r.createdAt).format('MM-DD HH:mm')}</div></div>,
-            color: r.statusTo === 5 ? 'green' : r.statusTo === 6 ? 'red' : 'blue',
+            children: <div><div>{r.description}</div><div style={{ color: '#768E7D', fontSize: 12 }}>{dayjs(r.createdAt).format('MM-DD HH:mm')}</div></div>,
+            color: r.statusTo === 5 ? '#3D6B4A' : r.statusTo === 6 ? '#D96C6C' : '#5B8C6B',
           }))} />
         ) : <Empty description="暂无追踪记录" />}
       </Card>
@@ -277,7 +277,7 @@ const OrderDetail: React.FC = () => {
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
           <div style={{ marginBottom: 8, fontWeight: 600 }}>评分</div>
           <Rate value={reviewRating} onChange={setReviewRating} style={{ fontSize: 32 }} />
-          <div style={{ color: '#999', marginTop: 4 }}>{['', '很差', '较差', '一般', '较好', '非常好'][reviewRating]}</div>
+          <div style={{ color: '#768E7D', marginTop: 4 }}>{['', '很差', '较差', '一般', '较好', '非常好'][reviewRating]}</div>
         </div>
         <div style={{ marginBottom: 16 }}>
           <div style={{ marginBottom: 8, fontWeight: 600 }}>快捷标签</div>

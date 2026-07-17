@@ -1,0 +1,98 @@
+/* ===== Global Base ===== */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #E9EEEA;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #17181C;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C4D0C7;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ACB9B0;
+}
+
+/* ===== Order table row — delivered highlight ===== */
+.row-delivered {
+  background-color: #F2F6F3 !important;
+}
+
+.row-delivered td {
+  font-weight: 500;
+}
+
+/* ===== Sider collapse trigger ===== */
+.ant-layout-sider-trigger {
+  border-top: 1px solid #E0E8E2 !important;
+  background: #F3F3F3 !important;
+  color: #768E7D !important;
+}
+
+.ant-layout-sider-trigger:hover {
+  background: #EBF0EC !important;
+  color: #4A7C59 !important;
+}
+
+/* ===== Sidebar menu — collapsed popup submenu ===== */
+.ant-menu-submenu-popup .ant-menu {
+  border-radius: 8px !important;
+  padding: 4px !important;
+}
+
+/* ===== Card subtle refinements ===== */
+.ant-card {
+  border: 1px solid #E8EDE9;
+}
+
+/* ===== Table header styling ===== */
+.ant-table-thead > tr > th {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ===== Smooth transitions ===== */
+.ant-btn,
+.ant-switch,
+.ant-tag,
+.ant-menu-item {
+  transition: all 0.2s ease;
+}
+
+/* ===== Status tag pill shape ===== */
+.status-tag {
+  border-radius: 20px;
+  padding: 2px 12px;
+  font-weight: 500;
+  border: none;
+}
+
+/* ===== Page header title ===== */
+.page-header-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #17181C;
+  margin: 0;
+}

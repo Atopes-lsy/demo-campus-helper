@@ -43,7 +43,7 @@ const OrderForm: React.FC = () => {
   if (role !== 'STUDENT') {
     return (
       <Card title="提示" style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
-        <p style={{ fontSize: 16, color: '#999', marginTop: 40, marginBottom: 40 }}>
+        <p style={{ fontSize: 16, color: '#768E7D', marginTop: 40, marginBottom: 40 }}>
           仅学生用户可以新建订单。
         </p>
         <Button type="primary" onClick={() => navigate('/student/orders')}>
@@ -163,10 +163,10 @@ const OrderForm: React.FC = () => {
 
                 {/* ---- Auto-calculated total ---- */}
                 <Divider />
-                <div style={{ fontSize: 16, fontWeight: 600, color: '#1677ff' }}>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#5B8C6B' }}>
                   订单金额（自动计算）：¥{totalAmount.toFixed(2)}
                 </div>
-                <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: '#768E7D', marginTop: 4 }}>
                   小件（20×20cm）= ¥4 &nbsp;|&nbsp;
                   中件（40×40cm）= ¥5 &nbsp;|&nbsp;
                   大件（60×60cm）= ¥8

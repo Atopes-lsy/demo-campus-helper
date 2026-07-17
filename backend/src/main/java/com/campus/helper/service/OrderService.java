@@ -176,12 +176,18 @@ public class OrderService {
         tracking.setOperatorType("STUDENT");
         orderTrackingMapper.insert(tracking);
 
-        // Increment student total_orders
+        // Check student exists and is active
         Student student = studentMapper.selectById(studentId);
-        if (student != null) {
-            student.setTotalOrders(student.getTotalOrders() + 1);
-            studentMapper.updateById(student);
+        if (student == null) {
+            throw new BusinessException(404, "学生账号不存在");
         }
+        if (student.getStatus() != null && student.getStatus() == 0) {
+            throw new BusinessException(403, "账号已被禁用，无法创建订单");
+        }
+
+        // Increment student total_orders
+        student.setTotalOrders(student.getTotalOrders() + 1);
+        studentMapper.updateById(student);
 
         log.info("Order created: orderNo={}, id={}", order.getOrderNo(), order.getId());
         return order;
