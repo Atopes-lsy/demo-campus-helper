@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,9 +41,15 @@ public class DispatchService {
     private static final double DEFAULT_DISTANCE_WEIGHT = 0.4;
     private static final double DEFAULT_RATING_WEIGHT = 0.3;
     private static final double DEFAULT_WORKLOAD_WEIGHT = 0.3;
-    private static final int MAX_RADIUS = 3000;
-    private static final double MIN_SCORE_THRESHOLD = 0.3;
     private static final int EARTH_RADIUS = 6371000;
+
+    /** Distance factor's search radius, in metres. Default mirrors the constant it replaced. */
+    @Value("${dispatch.max-radius:3000}")
+    private int maxRadius = 3000;
+
+    /** Below this score every candidate is considered unsuitable and the order stays open. */
+    @Value("${dispatch.min-score-threshold:0.3}")
+    private double minScoreThreshold = 0.3;
 
     /**
      * Dispatch an order to the best available runner using a multi-factor scoring algorithm.
@@ -133,19 +140,26 @@ public class DispatchService {
                     orderId, best.getRunner().getId(), best.getRunner().getName(), best.getScore());
 
             // Reject if best score below threshold
-            if (best.getScore() < MIN_SCORE_THRESHOLD) {
+            if (best.getScore() < minScoreThreshold) {
                 log.info("No suitable runner for order {}: best score {} < threshold {}",
-                        orderId, best.getScore(), MIN_SCORE_THRESHOLD);
+                        orderId, best.getScore(), minScoreThreshold);
                 return null;
             }
 
             Runner runner = best.getRunner();
 
-            // Update order: assign runner and set status to 1 (dispatched)
+            // Claim the order with the same conditional update the grab path uses
+            // (OrderService.updateStatus). We read a "pending" snapshot before scoring, and a
+            // runner can grab this order at any point in between. An unconditional write here
+            // would overwrite runner_id with the runner we picked and leave two runners owning
+            // one order. Losing the CAS means the grab path won, so back off untouched.
+            if (orderMapper.updateStatusIfCurrent(orderId, 0, 1, runner.getId(), null) != 1) {
+                log.info("Order {} was claimed by another path while scoring; dispatch backs off", orderId);
+                return null;
+            }
             order.setRunnerId(runner.getId());
             order.setStatus(1);
             order.setUpdatedAt(LocalDateTime.now());
-            orderMapper.updateById(order);
 
             // Update runner: set status to 1 (busy)
             runner.setStatus(1);
@@ -199,7 +213,7 @@ public class DispatchService {
                 order.getPickupLat().doubleValue(),
                 order.getPickupLng().doubleValue()
         );
-        return Math.max(0.0, 1.0 - distance / MAX_RADIUS);
+        return Math.max(0.0, 1.0 - distance / maxRadius);
     }
 
     /**

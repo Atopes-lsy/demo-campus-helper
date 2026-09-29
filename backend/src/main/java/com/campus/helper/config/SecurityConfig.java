@@ -44,6 +44,9 @@ public class SecurityConfig {
                                 "/api/search/**", "/api/students/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/payments/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/payments").hasRole("STUDENT")
+                        // Manual dispatch retry. New orders are auto-dispatched by
+                        // DispatchConsumer, so this is an operator action rather than a student's.
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/dispatch").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/runners/**").hasRole("ADMIN")
                         // The GET and PUT rules only cover those methods, so revoking a runner's
                         // sessions needs its own entry — otherwise any authenticated user could

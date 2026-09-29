@@ -7,7 +7,9 @@ import com.campus.helper.dto.OrderQueryDTO;
 import com.campus.helper.dto.OrderStatusUpdateDTO;
 import com.campus.helper.entity.Order;
 import com.campus.helper.entity.OrderTracking;
+import com.campus.helper.entity.Runner;
 import com.campus.helper.mapper.OrderTrackingMapper;
+import com.campus.helper.service.DispatchService;
 import com.campus.helper.service.OrderService;
 import com.campus.helper.common.BusinessException;
 import com.campus.helper.security.AuthenticatedUser;
@@ -24,11 +26,14 @@ public class OrderController {
 
     private final OrderService orderService;
     private final OrderTrackingMapper orderTrackingMapper;
+    private final DispatchService dispatchService;
 
     public OrderController(OrderService orderService,
-                           OrderTrackingMapper orderTrackingMapper) {
+                           OrderTrackingMapper orderTrackingMapper,
+                           DispatchService dispatchService) {
         this.orderService = orderService;
         this.orderTrackingMapper = orderTrackingMapper;
+        this.dispatchService = dispatchService;
     }
 
     @PostMapping
@@ -71,6 +76,27 @@ public class OrderController {
         authorizeTransition(order, body.getNewStatus(), user);
         orderService.updateStatus(id, body.getNewStatus(), user.userId(), user.role());
         return Result.success();
+    }
+
+    /**
+     * Trigger dispatch for a pending order by hand.
+     *
+     * <p>Newly created orders are normally dispatched automatically by {@code DispatchConsumer};
+     * this endpoint exists for demonstration and operations — most usefully to retry an order that
+     * dispatch previously declined because every runner was busy, and which nobody has grabbed
+     * since. ADMIN only, enforced by the path rules in {@code SecurityConfig}.
+     */
+    @PostMapping("/{id}/dispatch")
+    public Result dispatch(@PathVariable Long id) {
+        Order order = orderService.getById(id);
+        if (order.getStatus() != 0) {
+            throw new BusinessException(409, "订单当前状态为 " + order.getStatus() + "，不是待派单状态");
+        }
+        Runner runner = dispatchService.dispatch(id);
+        if (runner == null) {
+            throw new BusinessException(409, "未能派单：没有符合条件的空闲跑腿员，或订单已被抢单者抢先处理");
+        }
+        return Result.success(runner);
     }
 
     @GetMapping("/{id}/tracking")

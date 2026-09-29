@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.campus.helper.common.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ public class KafkaEventPublisher {
 
     private final OutboxEventMapper outboxEventMapper;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     /**
      * Publish an order status change event.
@@ -67,5 +69,9 @@ public class KafkaEventPublisher {
             throw new BusinessException(500, "订单事件序列化失败");
         }
         outboxEventMapper.insert(outbox);
+
+        // Ask for delivery once this transaction commits, instead of leaving the row to wait for
+        // the next poll tick. See OutboxWakeupListener — best effort, the poll still covers it.
+        applicationEventPublisher.publishEvent(new OutboxWakeupEvent());
     }
 }

@@ -58,8 +58,13 @@ deepseek:
     url: https://api.deepseek.com/v1
 
 dispatch:
+  # First refusal on newly created orders. When false, every order stays at status 0 and waits for
+  # a runner to grab it — the behaviour before this switch existed. Declining an order (no free
+  # runner, or best score under the threshold) leaves it in that same pool, so the two coexist.
+  auto-enabled: ${DISPATCH_AUTO_ENABLED:false}
   max-radius: 3000
   min-score-threshold: 0.3
+  # Still unreferenced: the retry/compensation scan behind this was never built.
   retry-interval: 600
 
 order:
