@@ -3,7 +3,6 @@ package com.campus.helper.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.campus.helper.entity.DeliveryDistanceMatrix;
 import com.campus.helper.entity.Order;
-import com.campus.helper.entity.OrderTracking;
 import com.campus.helper.mapper.DeliveryDistanceMatrixMapper;
 import com.campus.helper.mapper.OrderMapper;
 import com.campus.helper.mapper.OrderTrackingMapper;
@@ -64,6 +63,11 @@ public class DeliveryMatrixService {
         );
         log.info("Found {} completed orders for matrix computation", completedOrders.size());
 
+        // Load pickup/delivery timestamps for every completed order in one query. Looking
+        // them up per order inside the loop below cost 1+N queries, and this method runs
+        // hourly plus on every manual refresh.
+        Map<Long, LocalDateTime[]> timesByOrder = loadPickupDeliveryTimes(completedOrders);
+
         // Map: "pickup→delivery" → list of durations in minutes
         Map<String, List<Double>> routeDurations = new LinkedHashMap<>();
 
@@ -74,24 +78,9 @@ public class DeliveryMatrixService {
                 continue;
             }
 
-            // Find tracking records for this order: picked up and delivered
-            List<OrderTracking> trackings = orderTrackingMapper.selectList(
-                    new LambdaQueryWrapper<OrderTracking>()
-                            .eq(OrderTracking::getOrderId, order.getId())
-                            .orderByAsc(OrderTracking::getCreatedAt)
-            );
-
-            LocalDateTime pickupTime = null;
-            LocalDateTime deliveryTime = null;
-
-            for (OrderTracking t : trackings) {
-                if (t.getStatusTo() != null && t.getStatusTo() == 3 && pickupTime == null) {
-                    pickupTime = t.getCreatedAt();
-                }
-                if (t.getStatusTo() != null && t.getStatusTo() == 4 && deliveryTime == null) {
-                    deliveryTime = t.getCreatedAt();
-                }
-            }
+            LocalDateTime[] times = timesByOrder.get(order.getId());
+            LocalDateTime pickupTime = times != null ? times[0] : null;
+            LocalDateTime deliveryTime = times != null ? times[1] : null;
 
             // Fallback: if no tracking records with those statuses, use order timestamps
             if (pickupTime == null && order.getUpdatedAt() != null) {
@@ -164,6 +153,36 @@ public class DeliveryMatrixService {
     }
 
     /**
+     * Pickup (status_to=3) and delivery (status_to=4) timestamps per order id, in one query.
+     * Orders without either timestamp are absent from the map.
+     */
+    private Map<Long, LocalDateTime[]> loadPickupDeliveryTimes(List<Order> completedOrders) {
+        Map<Long, LocalDateTime[]> times = new HashMap<>();
+        if (completedOrders.isEmpty()) {
+            return times;
+        }
+        List<Long> orderIds = completedOrders.stream().map(Order::getId).toList();
+        for (Map<String, Object> row : orderTrackingMapper.selectPickupDeliveryTimes(orderIds)) {
+            Long orderId = ((Number) row.get("order_id")).longValue();
+            times.put(orderId, new LocalDateTime[]{
+                    toLocalDateTime(row.get("pickup_time")),
+                    toLocalDateTime(row.get("delivery_time"))
+            });
+        }
+        return times;
+    }
+
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime;
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+        return null;
+    }
+
+    /**
      * Get the estimated delivery time for a given route.
      *
      * @param pickupLocation  the pickup address
@@ -173,14 +192,10 @@ public class DeliveryMatrixService {
     public DeliveryDistanceMatrix getETA(String pickupLocation, String deliveryLocation) {
         DeliveryDistanceMatrix result = matrixMapper.selectByRoute(pickupLocation, deliveryLocation);
         if (result == null) {
-            // Try fuzzy: check if delivery matches a known pattern
-            result = matrixMapper.selectByPickup(pickupLocation).stream()
-                    .map(m -> matrixMapper.selectByRoute(
-                            (String) m.get("pickup_location"),
-                            (String) m.get("delivery_location")))
-                    .filter(Objects::nonNull)
-                    .findFirst()
-                    .orElse(null);
+            // Fall back to the fastest known route from the same pickup point. This used to
+            // list the candidate routes and then re-query each one to find a match — the
+            // same rows, read N times. A single query now returns the row directly.
+            result = matrixMapper.selectFirstByPickup(pickupLocation);
         }
         return result;
     }

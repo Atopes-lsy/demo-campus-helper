@@ -31,23 +31,18 @@ public class StatisticsController {
     public Result overview() {
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
 
-        // Today's orders count
-        Long todayOrders = orderMapper.selectCount(
-                new LambdaQueryWrapper<Order>()
-                        .ge(Order::getCreatedAt, todayStart)
-        );
+        // Today's order count and completed count in one query. Both are filtered on
+        // created_at, which is what selectTodayOrderStats computes.
+        Map<String, Object> todayStats = orderMapper.selectTodayOrderStats(todayStart);
+        Long todayOrders = todayStats == null || todayStats.get("total") == null
+                ? 0L : ((Number) todayStats.get("total")).longValue();
+        Long completedToday = todayStats == null || todayStats.get("completed") == null
+                ? 0L : ((Number) todayStats.get("completed")).longValue();
 
         // Online runners count (status = 0 or 1)
         Long onlineRunners = runnerMapper.selectCount(
                 new LambdaQueryWrapper<Runner>()
                         .in(Runner::getStatus, 0, 1)
-        );
-
-        // Completed orders today
-        Long completedToday = orderMapper.selectCount(
-                new LambdaQueryWrapper<Order>()
-                        .ge(Order::getCreatedAt, todayStart)
-                        .eq(Order::getStatus, 5)
         );
 
         // Completion rate: completedToday / todayOrders * 100
@@ -58,15 +53,12 @@ public class StatisticsController {
                     .divide(BigDecimal.valueOf(todayOrders), 2, RoundingMode.HALF_UP);
         }
 
-        // Today's revenue: sum of completed order amounts + tip
-        List<Order> completedTodayOrders = orderMapper.selectList(
-                new LambdaQueryWrapper<Order>()
-                        .ge(Order::getCompletedAt, todayStart)
-                        .eq(Order::getStatus, 5));
-        BigDecimal todayRevenue = completedTodayOrders.stream()
-                .map(o -> (o.getAmount() != null ? o.getAmount() : BigDecimal.ZERO)
-                        .add(o.getTip() != null ? o.getTip() : BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Today's revenue: aggregated in SQL rather than loading every completed order
+        // into memory and summing in Java.
+        BigDecimal todayRevenue = orderMapper.selectRevenueBetween(todayStart, todayStart.plusDays(1));
+        if (todayRevenue == null) {
+            todayRevenue = BigDecimal.ZERO;
+        }
 
         Map<String, Object> data = new HashMap<>();
         data.put("todayOrderCount", todayOrders);

@@ -2,7 +2,10 @@ package com.campus.helper.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.campus.helper.entity.Payment;
+import com.campus.helper.entity.Order;
 import com.campus.helper.mapper.PaymentMapper;
+import com.campus.helper.mapper.OrderMapper;
+import com.campus.helper.common.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -21,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 public class PaymentService {
 
     private final PaymentMapper paymentMapper;
+    private final OrderMapper orderMapper;
     private final NotificationService notificationService;
     private final RedissonClient redissonClient;
 
@@ -30,13 +34,32 @@ public class PaymentService {
      * Initial status is 0 (pending).
      */
     @Transactional
-    public Payment createPayment(Long orderId, String payChannel) {
+    public Payment createPayment(Long orderId, String payChannel, Long payerId) {
+        if (orderId == null || payChannel == null || payChannel.isBlank()) {
+            throw new BusinessException(400, "orderId和payChannel不能为空");
+        }
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(404, "订单不存在");
+        }
+        if (!payerId.equals(order.getStudentId())) {
+            throw new BusinessException(403, "只能为自己的订单创建支付");
+        }
+        Payment existing = paymentMapper.selectOne(new LambdaQueryWrapper<Payment>()
+                .eq(Payment::getOrderId, orderId).last("LIMIT 1"));
+        if (existing != null) {
+            return existing;
+        }
         Payment payment = new Payment();
         String paymentNo = "PAY"
                 + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
                 + String.format("%04d", ThreadLocalRandom.current().nextInt(10000));
         payment.setPaymentNo(paymentNo);
         payment.setOrderId(orderId);
+        payment.setPayerId(payerId);
+        payment.setPayeeId(order.getRunnerId() == null ? 0L : order.getRunnerId());
+        payment.setAmount(order.getAmount().add(order.getTip() == null
+                ? java.math.BigDecimal.ZERO : order.getTip()));
         payment.setPayChannel(payChannel);
         payment.setPayStatus(0);
         payment.setCreatedAt(LocalDateTime.now());
@@ -50,13 +73,13 @@ public class PaymentService {
      * On success: status becomes 2 (paid), sets paidAt.
      * On failure: status reverts to 0 (pending).
      */
-    public void handleCallback(String paymentNo, boolean success) {
+    @Transactional
+    public void handleCallback(String paymentNo, String transactionId, boolean success) {
         RLock lock = redissonClient.getLock("pay:callback:" + paymentNo);
         try {
             boolean acquired = lock.tryLock(3, 10, TimeUnit.SECONDS);
             if (!acquired) {
-                log.warn("Failed to acquire callback lock for payment {}", paymentNo);
-                return;
+                throw new BusinessException(409, "支付回调处理中，请稍后重试");
             }
 
             Payment payment = paymentMapper.selectOne(
@@ -64,10 +87,14 @@ public class PaymentService {
                             .eq(Payment::getPaymentNo, paymentNo)
             );
             if (payment == null) {
-                log.warn("Payment not found for callback: {}", paymentNo);
-                return;
+                throw new BusinessException(404, "支付记录不存在");
             }
 
+            if (payment.getPayStatus() != null && payment.getPayStatus() >= 2) {
+                log.info("Duplicate callback ignored for payment {}", paymentNo);
+                return;
+            }
+            payment.setTransactionId(transactionId);
             if (success) {
                 payment.setPayStatus(2);
                 payment.setPaidAt(LocalDateTime.now());
@@ -75,11 +102,12 @@ public class PaymentService {
                 payment.setPayStatus(0);
             }
             paymentMapper.updateById(payment);
+            notificationService.sendPaymentNotification(payment, success ? "成功" : "失败");
 
             log.info("Payment callback handled: paymentNo={}, success={}", paymentNo, success);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.error("Callback interrupted for payment {}", paymentNo, e);
+            throw new BusinessException(503, "支付回调处理被中断");
         } finally {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();

@@ -5,20 +5,23 @@ import com.campus.helper.entity.Order;
 import com.campus.helper.entity.OrderTracking;
 import com.campus.helper.entity.PricingRule;
 import com.campus.helper.entity.Runner;
+import com.campus.helper.event.KafkaEventPublisher;
 import com.campus.helper.mapper.OrderMapper;
 import com.campus.helper.mapper.OrderTrackingMapper;
-import com.campus.helper.mapper.PricingRuleMapper;
 import com.campus.helper.mapper.RunnerMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -30,9 +33,9 @@ public class DispatchService {
     private final RunnerMapper runnerMapper;
     private final OrderMapper orderMapper;
     private final OrderTrackingMapper orderTrackingMapper;
-    private final PricingRuleMapper pricingRuleMapper;
-    private final NotificationService notificationService;
+    private final PricingRuleService pricingRuleService;
     private final RedissonClient redissonClient;
+    private final KafkaEventPublisher kafkaEventPublisher;
 
     private static final double DEFAULT_DISTANCE_WEIGHT = 0.4;
     private static final double DEFAULT_RATING_WEIGHT = 0.3;
@@ -48,6 +51,7 @@ public class DispatchService {
      * @param orderId the order to dispatch
      * @return the assigned runner, or null if no suitable runner found
      */
+    @Transactional
     public Runner dispatch(Long orderId) {
         RLock lock = redissonClient.getLock("dispatch:order:" + orderId);
         try {
@@ -73,10 +77,9 @@ public class DispatchService {
             double ratW = DEFAULT_RATING_WEIGHT;
             double workW = DEFAULT_WORKLOAD_WEIGHT;
 
-            List<PricingRule> activeRules = pricingRuleMapper.selectList(
-                    new LambdaQueryWrapper<PricingRule>()
-                            .eq(PricingRule::getIsActive, 1)
-            );
+            // Served from cache: these rows change only when an admin tunes them, but are
+            // read on every dispatch.
+            List<PricingRule> activeRules = pricingRuleService.activeRules();
             for (PricingRule rule : activeRules) {
                 if ("DISPATCH_WEIGHT".equals(rule.getConditionType()) && rule.getPriceFactor() != null) {
                     String expr = rule.getConditionExpr();
@@ -106,12 +109,17 @@ public class DispatchService {
                 return null;
             }
 
+            // Load every runner's in-flight order count in one query. Scoring each candidate
+            // with its own COUNT used to cost 1+N queries per dispatch.
+            Map<Long, Long> activeOrdersByRunner = loadActiveOrderCounts();
+
             // Calculate score for each runner and sort descending
             List<RunnerScore> scored = availableRunners.stream()
                     .map(runner -> {
                         double distanceScore = calcDistanceScore(order, runner);
                         double ratingScore = calcRatingScore(runner);
-                        double workloadScore = calcWorkloadScore(runner);
+                        double workloadScore = calcWorkloadScore(
+                                runner, activeOrdersByRunner.getOrDefault(runner.getId(), 0L));
                         double total = distanceWeight * distanceScore
                                 + ratingWeight * ratingScore
                                 + workloadWeight * workloadScore;
@@ -155,10 +163,13 @@ public class DispatchService {
             tracking.setCreatedAt(LocalDateTime.now());
             orderTrackingMapper.insert(tracking);
 
-            // Send notifications to both student and runner
-            notificationService.sendDispatchNotification(order, runner);
-
             log.info("Order {} dispatched to runner {} ({})", orderId, runner.getId(), runner.getName());
+
+            // Persist the event in the same transaction via the outbox.
+            // NotificationConsumer delivers the student/runner notifications once.
+            kafkaEventPublisher.publish(order, "ORDER_DISPATCHED", 0, 1,
+                    "系统派单给" + runner.getName());
+
             return runner;
 
         } catch (InterruptedException e) {
@@ -202,18 +213,29 @@ public class DispatchService {
     }
 
     /**
+     * In-flight order count (status 1/2/3) per runner id, in a single query.
+     * Runners with no in-flight orders are simply absent from the map.
+     */
+    private Map<Long, Long> loadActiveOrderCounts() {
+        Map<Long, Long> counts = new HashMap<>();
+        for (Map<String, Object> row : orderMapper.selectActiveOrderCountByRunner()) {
+            Long runnerId = ((Number) row.get("runner_id")).longValue();
+            counts.put(runnerId, ((Number) row.get("active_orders")).longValue());
+        }
+        return counts;
+    }
+
+    /**
      * Calculate workload score based on current active order count vs max concurrent.
      * Score = max(0, 1 - currentLoad / maxConcurrent).
+     *
+     * @param activeOrders the runner's in-flight order count, pre-loaded by
+     *                     {@link #loadActiveOrderCounts()}
      */
-    private double calcWorkloadScore(Runner runner) {
-        Long currentLoad = orderMapper.selectCount(
-                new LambdaQueryWrapper<Order>()
-                        .eq(Order::getRunnerId, runner.getId())
-                        .in(Order::getStatus, List.of(1, 2, 3))
-        );
+    private double calcWorkloadScore(Runner runner, long activeOrders) {
         int maxConcurrent = runner.getMaxConcurrent() != null && runner.getMaxConcurrent() > 0
                 ? runner.getMaxConcurrent() : 3;
-        return Math.max(0.0, 1.0 - (double) currentLoad / maxConcurrent);
+        return Math.max(0.0, 1.0 - (double) activeOrders / maxConcurrent);
     }
 
     /**

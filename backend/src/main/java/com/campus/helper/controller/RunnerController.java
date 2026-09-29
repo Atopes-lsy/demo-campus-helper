@@ -3,9 +3,15 @@ package com.campus.helper.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.campus.helper.common.BusinessException;
+import com.campus.helper.common.PageQuery;
 import com.campus.helper.common.Result;
 import com.campus.helper.entity.Runner;
 import com.campus.helper.mapper.RunnerMapper;
+import com.campus.helper.security.AuthenticatedUser;
+import com.campus.helper.security.SecurityUtils;
+import com.campus.helper.security.TokenVersionService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -19,9 +25,14 @@ import java.util.concurrent.ThreadLocalRandom;
 public class RunnerController {
 
     private final RunnerMapper runnerMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final TokenVersionService tokenVersionService;
 
-    public RunnerController(RunnerMapper runnerMapper) {
+    public RunnerController(RunnerMapper runnerMapper, PasswordEncoder passwordEncoder,
+                            TokenVersionService tokenVersionService) {
         this.runnerMapper = runnerMapper;
+        this.passwordEncoder = passwordEncoder;
+        this.tokenVersionService = tokenVersionService;
     }
 
     /**
@@ -36,7 +47,7 @@ public class RunnerController {
             wrapper.eq(Runner::getStatus, status);
         }
         wrapper.orderByDesc(Runner::getCreatedAt);
-        Page<Runner> result = runnerMapper.selectPage(new Page<>(page, size), wrapper);
+        Page<Runner> result = runnerMapper.selectPage(PageQuery.of(page, size), wrapper);
         return Result.success(result);
     }
 
@@ -47,7 +58,11 @@ public class RunnerController {
     }
 
     @GetMapping("/{id}")
-    public Result getById(@PathVariable Long id) {
+    public Result getById(@PathVariable Long id, Authentication authentication) {
+        AuthenticatedUser user = SecurityUtils.current(authentication);
+        if (!SecurityUtils.isAdmin(user) && !("RUNNER".equals(user.role()) && id.equals(user.userId()))) {
+            throw new BusinessException(403, "只能查看自己的跑腿员资料");
+        }
         Runner runner = runnerMapper.selectById(id);
         if (runner == null) {
             throw new BusinessException(404, "跑腿员不存在");
@@ -86,10 +101,11 @@ public class RunnerController {
         runner.setPhone(phone);
         runner.setIdCard(idCard != null ? idCard : "");
 
-        // Password: use provided password, or default 123456
-        String password = body.get("password") != null
-                ? (String) body.get("password") : "123456";
-        runner.setPassword(password);
+        String password = (String) body.get("password");
+        if (password == null || password.length() < 6) {
+            throw new BusinessException(400, "密码至少6位");
+        }
+        runner.setPassword(passwordEncoder.encode(password));
 
         runner.setStatus(0);
         runner.setRating(new java.math.BigDecimal("5.0"));
@@ -120,7 +136,13 @@ public class RunnerController {
             runner.setIdCard((String) body.get("idCard"));
         }
         if (body.containsKey("status")) {
-            runner.setStatus(((Number) body.get("status")).intValue());
+            int newStatus = ((Number) body.get("status")).intValue();
+            runner.setStatus(newStatus);
+            if (newStatus == 2) {
+                // 2 means suspended. Suspending has to end the runner's sessions too,
+                // otherwise the token keeps working until it expires.
+                tokenVersionService.bump("RUNNER", id);
+            }
         }
         if (body.containsKey("maxConcurrent")) {
             runner.setMaxConcurrent(((Number) body.get("maxConcurrent")).intValue());
@@ -128,5 +150,20 @@ public class RunnerController {
 
         runnerMapper.updateById(runner);
         return Result.success(runner);
+    }
+
+    /**
+     * Kill every live session for a runner without suspending the account.
+     * Needs its own ADMIN rule in {@code SecurityConfig}: the blanket rules here only cover
+     * GET and PUT, so without it {@code anyRequest().authenticated()} would let any logged-in
+     * user revoke someone else's sessions.
+     */
+    @PostMapping("/{id}/revoke-tokens")
+    public Result revokeTokens(@PathVariable Long id) {
+        if (runnerMapper.selectById(id) == null) {
+            throw new BusinessException(404, "跑腿员不存在");
+        }
+        tokenVersionService.bump("RUNNER", id);
+        return Result.success(Map.of("message", "该跑腿员的所有会话已失效，需重新登录"));
     }
 }

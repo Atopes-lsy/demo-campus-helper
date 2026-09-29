@@ -18,4 +18,12 @@ public interface DeliveryDistanceMatrixMapper extends BaseMapper<DeliveryDistanc
 
     @Select("SELECT pickup_location, delivery_location, avg_minutes FROM delivery_distance_matrix WHERE pickup_location = #{pickup} ORDER BY avg_minutes ASC")
     List<Map<String, Object>> selectByPickup(@Param("pickup") String pickup);
+
+    /**
+     * The fastest known route from a pickup point, as an entity.
+     * Lets {@code getETA} fall back to a single query instead of re-reading every
+     * candidate route it just listed.
+     */
+    @Select("SELECT * FROM delivery_distance_matrix WHERE pickup_location = #{pickup} ORDER BY avg_minutes ASC LIMIT 1")
+    DeliveryDistanceMatrix selectFirstByPickup(@Param("pickup") String pickup);
 }

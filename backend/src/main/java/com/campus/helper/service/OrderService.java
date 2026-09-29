@@ -3,6 +3,7 @@ package com.campus.helper.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.campus.helper.common.BusinessException;
+import com.campus.helper.common.PageQuery;
 import com.campus.helper.common.StatusFlowValidator;
 import com.campus.helper.dto.OrderCreateDTO;
 import com.campus.helper.dto.PackageItemDTO;
@@ -17,7 +18,7 @@ import com.campus.helper.mapper.OrderTrackingMapper;
 import com.campus.helper.mapper.RunnerMapper;
 import com.campus.helper.mapper.StudentMapper;
 import com.campus.helper.mapper.PaymentMapper;
-import com.campus.helper.websocket.NotificationHandler;
+import com.campus.helper.event.KafkaEventPublisher;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -41,8 +42,8 @@ public class OrderService {
     private final OrderTrackingMapper orderTrackingMapper;
     private final StudentMapper studentMapper;
     private final RunnerMapper runnerMapper;
-    private final NotificationHandler notificationHandler;
     private final PaymentMapper paymentMapper;
+    private final KafkaEventPublisher kafkaEventPublisher;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Price per package size: small=4, medium=5, large=8 */
@@ -82,7 +83,7 @@ public class OrderService {
 
         wrapper.orderByDesc(Order::getCreatedAt);
 
-        Page<Order> page = new Page<>(query.getPage(), query.getSize());
+        Page<Order> page = PageQuery.of(query.getPage(), query.getSize());
         return orderMapper.selectPage(page, wrapper);
     }
 
@@ -106,7 +107,7 @@ public class OrderService {
      * pickup location, and delivery location.
      */
     @Transactional
-    public Order create(OrderCreateDTO dto) {
+    public Order create(OrderCreateDTO dto, Long studentId) {
         Order order = new Order();
 
         String orderNo = "ORD"
@@ -118,7 +119,10 @@ public class OrderService {
         BigDecimal totalAmount = BigDecimal.ZERO;
         StringBuilder sizeSummary = new StringBuilder();
         for (PackageItemDTO pkg : dto.getPackages()) {
-            BigDecimal price = PACKAGE_PRICE.getOrDefault(pkg.getSize(), BigDecimal.ZERO);
+            BigDecimal price = PACKAGE_PRICE.get(pkg.getSize());
+            if (price == null) {
+                throw new BusinessException(400, "不支持的包裹尺寸: " + pkg.getSize());
+            }
             totalAmount = totalAmount.add(price);
             if (sizeSummary.length() > 0) {
                 sizeSummary.append("+");
@@ -148,8 +152,6 @@ public class OrderService {
         order.setTip(dto.getTip() != null ? dto.getTip() : BigDecimal.ZERO);
         order.setStatus(0);
 
-        // Use student ID from the request (authenticated user)
-        Long studentId = dto.getStudentId();
         order.setStudentId(studentId);
 
         orderMapper.insert(order);
@@ -186,10 +188,14 @@ public class OrderService {
         }
 
         // Increment student total_orders
-        student.setTotalOrders(student.getTotalOrders() + 1);
+        student.setTotalOrders((student.getTotalOrders() == null ? 0 : student.getTotalOrders()) + 1);
         studentMapper.updateById(student);
 
         log.info("Order created: orderNo={}, id={}", order.getOrderNo(), order.getId());
+
+        // Publish Kafka event (fire-and-forget, does not block)
+        kafkaEventPublisher.publish(order, "ORDER_CREATED", null, 0, "学生提交订单");
+
         return order;
     }
 
@@ -205,16 +211,26 @@ public class OrderService {
         // Validate the state transition
         StatusFlowValidator.validate(oldStatus, newStatus);
 
-        // When a runner accepts the order (0→1), assign them
+        Runner acceptingRunner = null;
         if (newStatus == 1 && "RUNNER".equals(operatorType) && oldStatus == 0) {
-            order.setRunnerId(operatorId);
+            acceptingRunner = runnerMapper.selectById(operatorId);
+            if (acceptingRunner == null || Integer.valueOf(2).equals(acceptingRunner.getStatus())) {
+                throw new BusinessException(403, "跑腿员账号不存在或已停用");
+            }
         }
 
-        order.setStatus(newStatus);
-        if (newStatus == 5) {
-            order.setCompletedAt(LocalDateTime.now());
+        LocalDateTime completedAt = newStatus == 5 ? LocalDateTime.now() : null;
+        Long claimedRunnerId = newStatus == 1 && "RUNNER".equals(operatorType) && oldStatus == 0
+                ? operatorId : null;
+        if (orderMapper.updateStatusIfCurrent(
+                orderId, oldStatus, newStatus, claimedRunnerId, completedAt) != 1) {
+            throw new BusinessException(409, "订单状态已变化，请刷新后重试");
         }
-        orderMapper.updateById(order);
+        order.setStatus(newStatus);
+        if (newStatus == 1 && oldStatus == 0) {
+            order.setRunnerId(operatorId);
+        }
+        order.setCompletedAt(completedAt);
 
         // Insert tracking record
         OrderTracking tracking = new OrderTracking();
@@ -228,7 +244,7 @@ public class OrderService {
 
         // Update runner state on accept (status=1)
         if (newStatus == 1 && order.getRunnerId() != null) {
-            Runner runner = runnerMapper.selectById(order.getRunnerId());
+            Runner runner = acceptingRunner != null ? acceptingRunner : runnerMapper.selectById(order.getRunnerId());
             if (runner != null) {
                 runner.setStatus(1);
                 runnerMapper.updateById(runner);
@@ -236,18 +252,41 @@ public class OrderService {
             }
         }
 
-        // Update runner state on complete (status=5)
-        if (newStatus == 5 && order.getRunnerId() != null) {
+        // Release the runner when an assigned order is completed or cancelled.
+        if ((newStatus == 5 || newStatus == 6) && order.getRunnerId() != null) {
             Runner runner = runnerMapper.selectById(order.getRunnerId());
             if (runner != null) {
                 runner.setStatus(0);
-                runner.setCompletedOrders(runner.getCompletedOrders() + 1);
+                if (newStatus == 5) {
+                    runner.setCompletedOrders((runner.getCompletedOrders() == null
+                            ? 0 : runner.getCompletedOrders()) + 1);
+                }
                 runnerMapper.updateById(runner);
-                log.info("Runner {} set to idle, completed_orders incremented (order {})", runner.getId(), orderId);
+                log.info("Runner {} released from order {}", runner.getId(), orderId);
             }
         }
 
         log.info("Order {} status changed: {} -> {}", orderId, oldStatus, newStatus);
+
+        // Publish Kafka event for the status transition (fire-and-forget)
+        String eventType = mapEventType(newStatus);
+        String description = buildDescription(oldStatus, newStatus);
+        kafkaEventPublisher.publish(order, eventType, oldStatus, newStatus, description);
+    }
+
+    /**
+     * Map order status code to Kafka event type string.
+     */
+    private String mapEventType(Integer status) {
+        return switch (status) {
+            case 1 -> "ORDER_ACCEPTED";
+            case 2 -> "ORDER_PICKED_UP";
+            case 3 -> "ORDER_IN_TRANSIT";
+            case 4 -> "ORDER_DELIVERED";
+            case 5 -> "ORDER_COMPLETED";
+            case 6 -> "ORDER_CANCELLED";
+            default -> "ORDER_STATUS_CHANGED";
+        };
     }
 
     /**

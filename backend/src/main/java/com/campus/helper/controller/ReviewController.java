@@ -9,6 +9,9 @@ import com.campus.helper.entity.Runner;
 import com.campus.helper.mapper.OrderMapper;
 import com.campus.helper.mapper.ReviewMapper;
 import com.campus.helper.mapper.RunnerMapper;
+import com.campus.helper.security.AuthenticatedUser;
+import com.campus.helper.security.SecurityUtils;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -37,11 +40,12 @@ public class ReviewController {
      * Updates the runner's average rating.
      */
     @PostMapping
-    public Result submit(@RequestBody Map<String, Object> body) {
+    public Result submit(@RequestBody Map<String, Object> body, Authentication authentication) {
+        AuthenticatedUser user = SecurityUtils.current(authentication);
         Long orderId = body.get("orderId") != null
                 ? ((Number) body.get("orderId")).longValue() : null;
-        Integer reviewerType = body.get("reviewerType") != null
-                ? ((Number) body.get("reviewerType")).intValue() : null;
+        Integer reviewerType = "STUDENT".equals(user.role()) ? 1
+                : "RUNNER".equals(user.role()) ? 2 : null;
         Integer rating = body.get("rating") != null
                 ? ((Number) body.get("rating")).intValue() : null;
         String content = (String) body.get("content");
@@ -61,6 +65,11 @@ public class ReviewController {
         }
         if (order.getStatus() != 5) {
             throw new BusinessException(400, "只能评价已完成的订单");
+        }
+        boolean ownsOrder = reviewerType == 1 && user.userId().equals(order.getStudentId())
+                || reviewerType == 2 && user.userId().equals(order.getRunnerId());
+        if (!ownsOrder) {
+            throw new BusinessException(403, "无权评价该订单");
         }
 
         // Check duplicate: one review per reviewer_type per order
@@ -95,7 +104,22 @@ public class ReviewController {
      */
     @GetMapping("/order/{orderId}")
     public Result getByOrder(@PathVariable Long orderId,
-                             @RequestParam(required = false) Integer reviewerType) {
+                             @RequestParam(required = false) Integer reviewerType,
+                             Authentication authentication) {
+        AuthenticatedUser user = SecurityUtils.current(authentication);
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(404, "订单不存在");
+        }
+        boolean canView = SecurityUtils.isAdmin(user)
+                || ("STUDENT".equals(user.role()) && user.userId().equals(order.getStudentId()))
+                || ("RUNNER".equals(user.role()) && user.userId().equals(order.getRunnerId()));
+        if (!canView) {
+            throw new BusinessException(403, "无权查看该评价");
+        }
+        if (!SecurityUtils.isAdmin(user)) {
+            reviewerType = "STUDENT".equals(user.role()) ? 1 : 2;
+        }
         LambdaQueryWrapper<Review> wrapper = new LambdaQueryWrapper<Review>()
                 .eq(Review::getOrderId, orderId);
         if (reviewerType != null) {

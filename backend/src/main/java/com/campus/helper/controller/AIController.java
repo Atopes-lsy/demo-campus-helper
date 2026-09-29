@@ -2,6 +2,7 @@ package com.campus.helper.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.campus.helper.common.PageQuery;
 import com.campus.helper.common.Result;
 import com.campus.helper.entity.AIChatHistory;
 import com.campus.helper.entity.AnomalyAlert;
@@ -10,10 +11,12 @@ import com.campus.helper.mapper.AnomalyAlertMapper;
 import com.campus.helper.service.AIChatService;
 import com.campus.helper.service.AnomalyDetector;
 import com.campus.helper.service.DeliveryMatrixService;
+import com.campus.helper.service.PricingRuleService;
 import com.campus.helper.service.SmartPricingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +27,7 @@ public class AIController {
 
     private final AIChatService aiChatService;
     private final SmartPricingService smartPricingService;
+    private final PricingRuleService pricingRuleService;
     private final AnomalyDetector anomalyDetector;
     private final DeliveryMatrixService deliveryMatrixService;
     private final AnomalyAlertMapper anomalyAlertMapper;
@@ -85,12 +89,29 @@ public class AIController {
         return Result.success(suggestion);
     }
 
+    /**
+     * Apply a change to a pricing rule. The AI could suggest factors but nothing could store
+     * them, which left the {@code pricing_rule} table read-only.
+     *
+     * <p>Inherits the ADMIN-only guard on {@code /api/ai/**}. The write evicts the cached
+     * rule set once its transaction commits.
+     */
+    @PutMapping("/pricing/{id}")
+    public Result updatePricingRule(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        BigDecimal priceFactor = body.get("priceFactor") != null
+                ? new BigDecimal(body.get("priceFactor").toString()) : null;
+        Boolean isActive = body.get("isActive") != null
+                ? Boolean.valueOf(body.get("isActive").toString()) : null;
+        String reasoning = (String) body.get("aiReasoning");
+        return Result.success(pricingRuleService.updateRule(id, priceFactor, isActive, reasoning));
+    }
+
     @GetMapping("/anomalies")
     public Result listAnomalies(@RequestParam(defaultValue = "1") int page,
                                 @RequestParam(defaultValue = "10") int size) {
         LambdaQueryWrapper<AnomalyAlert> wrapper = new LambdaQueryWrapper<>();
         wrapper.orderByDesc(AnomalyAlert::getDetectedAt);
-        Page<AnomalyAlert> result = anomalyAlertMapper.selectPage(new Page<>(page, size), wrapper);
+        Page<AnomalyAlert> result = anomalyAlertMapper.selectPage(PageQuery.of(page, size), wrapper);
         return Result.success(result);
     }
 

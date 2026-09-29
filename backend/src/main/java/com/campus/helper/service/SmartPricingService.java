@@ -8,7 +8,6 @@ import com.campus.helper.entity.Order;
 import com.campus.helper.entity.PricingRule;
 import com.campus.helper.entity.Runner;
 import com.campus.helper.mapper.OrderMapper;
-import com.campus.helper.mapper.PricingRuleMapper;
 import com.campus.helper.mapper.RunnerMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +26,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SmartPricingService {
 
-    private final PricingRuleMapper pricingRuleMapper;
+    private final PricingRuleService pricingRuleService;
     private final DeepSeekClient deepSeekClient;
     private final OrderMapper orderMapper;
     private final RunnerMapper runnerMapper;
@@ -46,10 +45,8 @@ public class SmartPricingService {
         double base = 3.0 + Math.max(0.0, (distanceMeters - 500) / 500) * 2.0;
         BigDecimal basePrice = BigDecimal.valueOf(base).setScale(2, RoundingMode.HALF_UP);
 
-        // Load active pricing rules
-        List<PricingRule> activeRules = pricingRuleMapper.selectList(
-                new LambdaQueryWrapper<PricingRule>().eq(PricingRule::getIsActive, 1)
-        );
+        // Active rules, served from cache
+        List<PricingRule> activeRules = pricingRuleService.activeRules();
 
         // Build factors map and compute product
         Map<String, BigDecimal> factors = new LinkedHashMap<>();

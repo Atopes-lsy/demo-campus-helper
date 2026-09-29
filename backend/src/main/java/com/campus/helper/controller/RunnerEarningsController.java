@@ -7,6 +7,9 @@ import com.campus.helper.entity.Order;
 import com.campus.helper.entity.Runner;
 import com.campus.helper.mapper.OrderMapper;
 import com.campus.helper.mapper.RunnerMapper;
+import com.campus.helper.security.AuthenticatedUser;
+import com.campus.helper.security.SecurityUtils;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -32,7 +35,11 @@ public class RunnerEarningsController {
      * and the most recent completed orders.
      */
     @GetMapping("/{id}/earnings")
-    public Result getEarnings(@PathVariable Long id) {
+    public Result getEarnings(@PathVariable Long id, Authentication authentication) {
+        AuthenticatedUser user = SecurityUtils.current(authentication);
+        if (!SecurityUtils.isAdmin(user) && !("RUNNER".equals(user.role()) && id.equals(user.userId()))) {
+            throw new BusinessException(403, "只能查看自己的收入");
+        }
         Runner runner = runnerMapper.selectById(id);
         if (runner == null) {
             throw new BusinessException(404, "跑腿员不存在");

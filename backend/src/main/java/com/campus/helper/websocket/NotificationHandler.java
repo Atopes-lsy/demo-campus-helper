@@ -25,14 +25,4 @@ public class NotificationHandler {
                 payload
         );
     }
-
-    /**
-     * Send a message to a topic (broadcast).
-     *
-     * @param topic   the topic path (e.g., "/topic/orders")
-     * @param payload the message payload
-     */
-    public void sendToTopic(String topic, Object payload) {
-        messagingTemplate.convertAndSend(topic, payload);
-    }
 }

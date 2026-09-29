@@ -4,6 +4,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -19,10 +22,11 @@ public class OrderCreateDTO {
     private String deliveryLocation;
 
     @NotNull(message = "Order type cannot be null")
+    @Min(value = 1, message = "Order type must be between 1 and 2")
+    @Max(value = 2, message = "Order type must be between 1 and 2")
     private Integer orderType;
 
-    /** Student placing this order */
-    @NotNull(message = "Student ID cannot be null")
+    /** Ignored by the server; the student ID comes from the access token. */
     private Long studentId;
 
     /** Packages in this order — at least one required. Size determines price. */
@@ -34,5 +38,6 @@ public class OrderCreateDTO {
     private String pickupCode;
 
     /** Optional tip — defaults to 0 */
+    @DecimalMin(value = "0.0", inclusive = true, message = "Tip cannot be negative")
     private BigDecimal tip;
 }

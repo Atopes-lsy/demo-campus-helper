@@ -2,6 +2,7 @@ package com.campus.helper.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -13,6 +14,7 @@ public class Student {
     private String studentNo;
     private String name;
     private String phone;
+    @JsonIgnore
     private String password;
     private String dormitory;
     private String avatarUrl;
