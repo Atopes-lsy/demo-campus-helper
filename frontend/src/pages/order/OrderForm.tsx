@@ -29,7 +29,7 @@ function calcTotal(packages: PackageItem[] | undefined): number {
 
 const OrderForm: React.FC = () => {
   const navigate = useNavigate();
-  const { role, userId } = useAuth();
+  const { role } = useAuth();
   const [form] = Form.useForm<OrderFormValues>();
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -57,7 +57,6 @@ const OrderForm: React.FC = () => {
     setSubmitting(true);
     try {
       const payload = {
-        studentId: userId,
         orderType: values.orderType,
         pickupLocation: values.pickupLocation,
         deliveryLocation: values.deliveryLocation,

@@ -35,7 +35,7 @@ interface Props {
 
 const OrderList: React.FC<Props> = ({ mode }) => {
   const navigate = useNavigate();
-  const { role, userId } = useAuth();
+  const { role } = useAuth();
   const [dataSource, setDataSource] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
@@ -61,14 +61,6 @@ const OrderList: React.FC<Props> = ({ mode }) => {
         size: pagination.pageSize,
       };
 
-      // Auto-filters based on mode
-      if (mode === 'student-own') {
-        params.studentId = userId;
-      } else if (mode === 'runner-deliveries') {
-        params.runnerId = userId;
-      }
-      // admin-all: no auto-filter
-
       if (filters.orderType !== undefined) params.orderType = filters.orderType;
       if (filters.status !== undefined) params.status = filters.status;
       if (filters.keyword) params.keyword = filters.keyword;
@@ -85,7 +77,7 @@ const OrderList: React.FC<Props> = ({ mode }) => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.current, pagination.pageSize, filters, mode, userId]);
+  }, [pagination.current, pagination.pageSize, filters, mode]);
 
   useEffect(() => {
     fetchOrders();
@@ -115,7 +107,7 @@ const OrderList: React.FC<Props> = ({ mode }) => {
   // ---- Student actions ----
   const handleCancel = async (id: number) => {
     try {
-      await updateOrderStatus(id, { newStatus: 6, operatorId: userId, operatorType: 'STUDENT' });
+      await updateOrderStatus(id, { newStatus: 6 });
       message.success('订单已取消');
       fetchOrders();
     } catch {
@@ -125,7 +117,7 @@ const OrderList: React.FC<Props> = ({ mode }) => {
 
   const handleConfirmReceipt = async (id: number) => {
     try {
-      await updateOrderStatus(id, { newStatus: 5, operatorId: userId, operatorType: 'STUDENT' });
+      await updateOrderStatus(id, { newStatus: 5 });
       message.success('已确认收货');
       fetchOrders();
     } catch {
@@ -136,7 +128,7 @@ const OrderList: React.FC<Props> = ({ mode }) => {
   // ---- Runner actions ----
   const handlePickedUp = async (id: number) => {
     try {
-      await updateOrderStatus(id, { newStatus: 3, operatorId: userId, operatorType: 'RUNNER' });
+      await updateOrderStatus(id, { newStatus: 3 });
       message.success('已标记为配送中');
       fetchOrders();
     } catch {
@@ -146,7 +138,7 @@ const OrderList: React.FC<Props> = ({ mode }) => {
 
   const handleDelivered = async (id: number) => {
     try {
-      await updateOrderStatus(id, { newStatus: 4, operatorId: userId, operatorType: 'RUNNER' });
+      await updateOrderStatus(id, { newStatus: 4 });
       message.success('已标记为已送达');
       fetchOrders();
     } catch {
@@ -182,7 +174,7 @@ const OrderList: React.FC<Props> = ({ mode }) => {
   // ---- Admin actions ----
   const handleForceCancel = async (id: number) => {
     try {
-      await updateOrderStatus(id, { newStatus: 6, operatorId: userId, operatorType: 'ADMIN' });
+      await updateOrderStatus(id, { newStatus: 6 });
       message.success('订单已被管理员强制取消');
       fetchOrders();
     } catch {

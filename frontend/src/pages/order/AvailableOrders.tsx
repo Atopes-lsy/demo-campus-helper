@@ -22,7 +22,6 @@ interface OrderRecord {
 
 const AvailableOrders: React.FC = () => {
   const navigate = useNavigate();
-  const { userId } = useAuth();
   const [dataSource, setDataSource] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
@@ -68,8 +67,6 @@ const AvailableOrders: React.FC = () => {
     try {
       await updateOrderStatus(orderId, {
         newStatus: 1,
-        operatorId: userId,
-        operatorType: 'RUNNER',
       });
       message.success('接单成功！');
       fetchOrders();

@@ -9,8 +9,9 @@ export const ORDER_STATUS_MAP: Record<number, { label: string; color: string }> 
 };
 
 export const ORDER_TYPE_MAP: Record<number, { label: string; icon: string }> = {
-  1: { label: '代取外卖', icon: '🍔' },
-  2: { label: '代取包裹', icon: '📦' },
+  1: { label: '代取快递', icon: '📦' },
+  2: { label: '代买餐饮', icon: '🍔' },
+  3: { label: '代购商品', icon: '🛒' },
 };
 
 export const RUNNER_STATUS_MAP: Record<number, { label: string; color: string }> = {

@@ -40,7 +40,7 @@ const STATUS_STEPS = [
 const OrderDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { role, userId } = useAuth();
+  const { role } = useAuth();
   const [order, setOrder] = useState<OrderDetailData | null>(null);
   const [tracking, setTracking] = useState<TrackingRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +97,7 @@ const OrderDetail: React.FC = () => {
     if (!order) return;
     setActionLoading(true);
     try {
-      await updateOrderStatus(order.id, { newStatus, operatorId: userId, operatorType });
+      await updateOrderStatus(order.id, { newStatus });
       await fetchData();
 
       // Student just confirmed receipt — pop review modal directly

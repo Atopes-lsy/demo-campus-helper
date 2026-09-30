@@ -6,6 +6,16 @@ const http = axios.create({
   timeout: 30000,
 });
 
+http.interceptors.request.use((config) => {
+  try {
+    const auth = JSON.parse(localStorage.getItem('campus_helper_auth') || '{}');
+    if (auth.token) config.headers.Authorization = `Bearer ${auth.token}`;
+  } catch {
+    localStorage.removeItem('campus_helper_auth');
+  }
+  return config;
+});
+
 http.interceptors.response.use(
   (response) => {
     const res = response.data;
@@ -16,7 +26,13 @@ http.interceptors.response.use(
     return res;
   },
   (error) => {
-    message.error(error.message || '网络错误');
+    const status = error.response?.status;
+    const errorMessage = error.response?.data?.message || error.message || '网络错误';
+    if (status === 401) {
+      localStorage.removeItem('campus_helper_auth');
+      if (window.location.pathname !== '/login') window.location.assign('/login');
+    }
+    message.error(errorMessage);
     return Promise.reject(error);
   }
 );

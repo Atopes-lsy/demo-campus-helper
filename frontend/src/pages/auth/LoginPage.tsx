@@ -10,6 +10,8 @@ interface LoginResult {
   userId: number;
   name: string;
   role: ViewerRole;
+  token: string;
+  expiresAt: number;
 }
 
 const LoginPage: React.FC = () => {
@@ -19,7 +21,7 @@ const LoginPage: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<string>('student');
 
   const handleLoginSuccess = (data: LoginResult) => {
-    login(data.role, data.userId, data.name);
+    login(data.role, data.userId, data.name, data.token, data.expiresAt);
     message.success(`欢迎，${data.name}！`);
     navigate(ROLE_DEFAULTS[data.role]);
   };

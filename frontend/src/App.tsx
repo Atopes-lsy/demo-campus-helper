@@ -1,23 +1,24 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu, Space, Tag, Button, FloatButton } from 'antd';
+import { Layout, Menu, Space, Tag, Button, FloatButton, Spin, notification } from 'antd';
 import { LogoutOutlined, RobotOutlined } from '@ant-design/icons';
-import OrderList from './pages/order/OrderList';
-import OrderForm from './pages/order/OrderForm';
-import OrderDetail from './pages/order/OrderDetail';
-import AvailableOrders from './pages/order/AvailableOrders';
-import TransactionList from './pages/transaction/TransactionList';
-import RegisterRunner from './pages/runner/RegisterRunner';
-import EarningsDashboard from './pages/runner/EarningsDashboard';
-import RunnerManagement from './pages/admin/RunnerManagement';
-import StudentManagement from './pages/admin/StudentManagement';
-import LoginPage from './pages/auth/LoginPage';
-import AIChat from './pages/ai/AIChat';
-import AnomalyList from './pages/ai/AnomalyList';
-import Dashboard from './pages/dashboard/Dashboard';
+const OrderList = React.lazy(() => import('./pages/order/OrderList'));
+const OrderForm = React.lazy(() => import('./pages/order/OrderForm'));
+const OrderDetail = React.lazy(() => import('./pages/order/OrderDetail'));
+const AvailableOrders = React.lazy(() => import('./pages/order/AvailableOrders'));
+const TransactionList = React.lazy(() => import('./pages/transaction/TransactionList'));
+const RegisterRunner = React.lazy(() => import('./pages/runner/RegisterRunner'));
+const EarningsDashboard = React.lazy(() => import('./pages/runner/EarningsDashboard'));
+const RunnerManagement = React.lazy(() => import('./pages/admin/RunnerManagement'));
+const StudentManagement = React.lazy(() => import('./pages/admin/StudentManagement'));
+const LoginPage = React.lazy(() => import('./pages/auth/LoginPage'));
+const AIChat = React.lazy(() => import('./pages/ai/AIChat'));
+const AnomalyList = React.lazy(() => import('./pages/ai/AnomalyList'));
+const Dashboard = React.lazy(() => import('./pages/dashboard/Dashboard'));
 import RoleGuard, { ROLE_DEFAULTS } from './components/RoleGuard';
 import { ROLE_MENUS } from './config/menus';
 import { useAuth, ViewerRole } from './contexts/AuthContext';
+import { useWebSocket } from './hooks/useWebSocket';
 
 const { Header, Sider, Content } = Layout;
 
@@ -33,6 +34,12 @@ const ROLE_OPTIONS: { value: ViewerRole; label: string }[] = [
   { value: 'ADMIN', label: '管理员' },
 ];
 
+const PageFallback = (
+  <div style={{ minHeight: 240, display: 'grid', placeItems: 'center' }}>
+    <Spin size="large" />
+  </div>
+);
+
 /** Wraps authenticated pages — redirects to /login if not logged in */
 const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isLoggedIn } = useAuth();
@@ -46,6 +53,14 @@ const App: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { role, isLoggedIn, userName, logout } = useAuth();
+  const [notificationApi, notificationContext] = notification.useNotification();
+  useWebSocket(isLoggedIn, (payload) => {
+    notificationApi.info({
+      message: payload.title || '订单通知',
+      description: payload.content || '订单状态已更新',
+      placement: 'topRight',
+    });
+  });
 
   const menuItems = ROLE_MENUS[role];
   const selectedKey: string =
@@ -72,15 +87,22 @@ const App: React.FC = () => {
   // For login/register pages, render without sidebar
   if (isPublicRoute && !isLoggedIn) {
     return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/runner/register" element={<RegisterRunner />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <>
+        {notificationContext}
+        <Suspense fallback={PageFallback}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/runner/register" element={<RegisterRunner />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Suspense>
+      </>
     );
   }
 
   return (
+    <>
+    {notificationContext}
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
         collapsible
@@ -163,7 +185,8 @@ const App: React.FC = () => {
               '0 1px 3px rgba(23, 24, 28, 0.04), 0 1px 2px rgba(23, 24, 28, 0.03)',
           }}
         >
-          <Routes>
+          <Suspense fallback={PageFallback}>
+            <Routes>
             <Route path="/" element={<Navigate to={ROLE_DEFAULTS[role]} replace />} />
             <Route path="/login" element={<Navigate to={ROLE_DEFAULTS[role]} replace />} />
 
@@ -194,7 +217,8 @@ const App: React.FC = () => {
             <Route path="/orders" element={<Navigate to={ROLE_DEFAULTS[role]} replace />} />
             <Route path="/orders/new" element={<Navigate to="/student/orders/new" replace />} />
             <Route path="*" element={<Navigate to={ROLE_DEFAULTS[role]} replace />} />
-          </Routes>
+            </Routes>
+          </Suspense>
         </Content>
         {/* AI Assistant floating button — ADMIN only */}
         {role === 'ADMIN' && (
@@ -208,6 +232,7 @@ const App: React.FC = () => {
         )}
       </Layout>
     </Layout>
+    </>
   );
 };
 
