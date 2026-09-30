@@ -5,6 +5,7 @@ node_modules/
 # Build output
 frontend/dist/
 backend/target/
+frontend/tsconfig.tsbuildinfo
 
 # IDE
 .idea/
