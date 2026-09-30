@@ -108,7 +108,9 @@
       # Passed through so the BCrypt path works in containers too; empty means fall back to
       # the plaintext password above (the app logs a warning at startup in that case).
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
-      PAYMENT_CALLBACK_SECRET: ${PAYMENT_CALLBACK_SECRET:-campus-helper-payment-callback-2026}
+      # No default on purpose: a committed fallback would publish the secret that guards
+      # payment callbacks, exactly as JWT_SECRET above is required rather than defaulted.
+      PAYMENT_CALLBACK_SECRET: ${PAYMENT_CALLBACK_SECRET:?PAYMENT_CALLBACK_SECRET is required}
       TZ: Asia/Shanghai
 
   frontend:
