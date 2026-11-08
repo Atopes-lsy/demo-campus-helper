@@ -9,8 +9,11 @@
 ```bash
 # 1. 确保已安装 Docker Desktop
 
-# 2. 一键启动所有服务
-docker compose up -d
+# 2. 复制 .env.example 为 .env，设置本机测试用密码、JWT_SECRET 和回调密钥
+# 不要使用示例密钥部署；管理员密码以 .env 为准
+
+# 3. 构建并启动所有服务
+docker compose up -d --build
 
 # 3. 等待约 1 分钟，打开浏览器
 # http://localhost:8089
@@ -25,7 +28,7 @@ docker compose up -d
 |------|----------|------|
 | 学生 | 学号 `20240101001` | `123456` |
 | 跑腿员 | 手机号 `13900002001` | `123456` |
-| 管理员 | 用户名 `admin` | `admin123` |
+| 管理员 | `.env` 中的 `ADMIN_USERNAME` | `.env` 中配置的密码（无固定默认密码） |
 
 ## 本地开发
 
@@ -77,8 +80,12 @@ cd ../frontend
 npm run build               # TypeScript 检查与生产构建
 
 cd ..
-powershell -File campus-test.ps1  # 已启动 Compose 环境的 API 冒烟测试
+powershell -File campus-test.ps1 -AdminPassword '<本地管理员密码>'
 ```
+
+PowerShell 可先设置 `$env:CAMPUS_HELPER_ADMIN_PASSWORD`，再运行 `./campus-test.ps1`，避免把密码写进命令历史。入口不依赖当前目录；`test-api.ps1` 随仓库交付。默认入口为 `http://localhost:8089`，可用 `-BaseUrl` 覆盖。脚本检查登录、匿名管理接口 401、看板和搜索，并通过 Compose 服务名核对 ES 原生计数；服务故障或数据结构错误会抛出异常。
+
+可靠性专项：`mvn -Pintegration "-Dit.test=CampusHelperApplicationIT,DispatchCoexistenceIT" verify`。包括真实 MySQL 下 16 跑腿员竞争、30 轮自动派单与抢单竞争，以及暂停测试 Kafka 后恢复投递和重复事件去重。测试定义不代表已通过，实际执行结果见 [可靠性验收](docs/可靠性验收-2026-11-08.md)。
 
 ## 核心功能
 
@@ -165,5 +172,5 @@ campus-helper/
 
 ## 文档
 
-- [技术文档](./校园代领平台-技术文档.md) — 完整 API 文档、数据库设计、业务流程
-- [Docker 部署指南](./校园代领平台-Docker部署指南.md) — 容器管理、环境配置、常见问题
+- [技术文档](docs/校园代领平台-技术文档.md) — 完整 API 文档、数据库设计、业务流程
+- [Docker 部署指南](docs/校园代领平台-Docker部署指南.md) — 容器管理、环境配置、常见问题

@@ -44,6 +44,7 @@ import static org.mockito.Mockito.verify;
  * than merely run the two calls near each other.
  */
 @Testcontainers
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(properties = {
         "security.jwt.secret=test-dispatch-coexistence-jwt-secret-32b",
         "security.admin.username=admin",

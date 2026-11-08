@@ -5,6 +5,10 @@ import com.campus.helper.common.BusinessException;
 import com.campus.helper.entity.OrderDocument;
 import com.campus.helper.security.LoginAttemptService;
 import com.campus.helper.security.TokenVersionService;
+import com.campus.helper.event.OrderEvent;
+import com.campus.helper.event.KafkaConfig;
+import com.campus.helper.service.OrderService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
@@ -29,15 +33,22 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.UUID;
+import java.util.concurrent.*;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "outbox.publish-interval-ms=200",
                 "outbox.batch-size=10",
+                "dispatch.auto-enabled=false",
                 "security.jwt.secret=test-integration-jwt-secret-at-least-32-bytes",
                 "security.admin.username=admin",
                 "security.admin.password=admin123",
@@ -99,6 +110,128 @@ class CampusHelperApplicationIT {
 
     @Autowired
     TokenVersionService tokenVersionService;
+
+    @Autowired OrderService orderService;
+    @Autowired KafkaTemplate<String, OrderEvent> kafka;
+    @Autowired ObjectMapper objectMapper;
+
+    /** Real service transactions and MySQL CAS, with a barrier releasing 16 callers together. */
+    @Test
+    void sixteenRunnersCompeteForOneOrderWithoutDuplicateSideEffects() throws Exception {
+        String student = login("/api/auth/student/login",
+                Map.of("studentNo", "20240101001", "password", "123456"));
+        long orderId = createEvidenceOrder(student, "并发验收");
+        int contenders = 16;
+        List<Long> runners = new ArrayList<>();
+        for (int i = 0; i < contenders; i++) {
+            String no = "R" + UUID.randomUUID().toString().replace("-", "").substring(0, 18);
+            jdbc.update("INSERT INTO runner(runner_no,name,phone,id_card,status,rating,max_concurrent)"
+                            + " VALUES(?,?,?,?,0,5.0,3)", no, "并发验收", "13800000000", "110101199001010011");
+            runners.add(jdbc.queryForObject("SELECT id FROM runner WHERE runner_no=?", Long.class, no));
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(contenders);
+        CyclicBarrier barrier = new CyclicBarrier(contenders);
+        List<Future<Integer>> results = new ArrayList<>();
+        try {
+            for (long runnerId : runners) {
+                results.add(pool.submit(() -> {
+                    barrier.await(15, TimeUnit.SECONDS);
+                    try {
+                        orderService.updateStatus(orderId, 1, runnerId, "RUNNER");
+                        return 200;
+                    } catch (BusinessException conflict) {
+                        // A caller that reads after the winner commits sees 1→1 (400);
+                        // a caller that read 0 but loses the CAS receives 409.
+                        assertThat(conflict.getCode()).isIn(400, 409);
+                        return conflict.getCode();
+                    }
+                }));
+            }
+            int successes = 0;
+            for (Future<Integer> result : results) {
+                if (result.get(45, TimeUnit.SECONDS) == 200) successes++;
+            }
+            assertThat(successes).isEqualTo(1);
+            Long owner = jdbc.queryForObject("SELECT runner_id FROM order_info WHERE id=?", Long.class, orderId);
+            assertThat(runners).contains(owner);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM order_tracking WHERE order_id=?"
+                    + " AND status_from=0 AND status_to=1", Integer.class, orderId)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM event_outbox WHERE aggregate_id=?"
+                    + " AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.eventType'))='ORDER_ACCEPTED'",
+                    Integer.class, orderId)).isEqualTo(1);
+            long busy = runners.stream().filter(id -> Integer.valueOf(1).equals(jdbc.queryForObject(
+                    "SELECT status FROM runner WHERE id=?", Integer.class, id))).count();
+            assertThat(busy).isEqualTo(1);
+            System.out.printf("EVIDENCE concurrency: callers=%d winners=%d claim-tracking=1 claim-outbox=1 busy-runners=%d%n",
+                    contenders, successes, busy);
+        } finally {
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    /** Pause only this test's Kafka container; restore it even if an assertion fails. */
+    @Test
+    void brokerOutageRecoversAndDuplicateDeliveryDoesNotDuplicateNotifications() throws Exception {
+        String student = login("/api/auth/student/login",
+                Map.of("studentNo", "20240101001", "password", "123456"));
+        long orderId;
+        KAFKA.getDockerClient().pauseContainerCmd(KAFKA.getContainerId()).exec();
+        try {
+            orderId = createEvidenceOrder(student, "故障恢复验收");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM order_info WHERE id=?",
+                    Integer.class, orderId)).isEqualTo(1);
+            Awaitility.await().atMost(Duration.ofSeconds(45)).untilAsserted(() -> {
+                assertThat(jdbc.queryForObject("SELECT status FROM event_outbox WHERE aggregate_id=?",
+                        String.class, orderId)).isEqualTo("FAILED");
+                assertThat(jdbc.queryForObject("SELECT retry_count FROM event_outbox WHERE aggregate_id=?",
+                        Integer.class, orderId)).isGreaterThanOrEqualTo(1);
+            });
+            System.out.println("EVIDENCE outage: order-committed=1 outbox=FAILED retry>=1");
+        } finally {
+            KAFKA.getDockerClient().unpauseContainerCmd(KAFKA.getContainerId()).exec();
+        }
+        String eventId = jdbc.queryForObject("SELECT event_id FROM event_outbox WHERE aggregate_id=?",
+                String.class, orderId);
+        Awaitility.await().atMost(Duration.ofSeconds(90)).untilAsserted(() -> {
+            assertThat(jdbc.queryForObject("SELECT status FROM event_outbox WHERE event_id=?",
+                    String.class, eventId)).isEqualTo("SENT");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM processed_event WHERE event_id=?",
+                    Integer.class, eventId)).isEqualTo(4);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE related_order_id=?",
+                    Integer.class, orderId)).isEqualTo(1);
+            assertThat(elasticsearchOperations.get(String.valueOf(orderId), OrderDocument.class)).isNotNull();
+        });
+        OrderEvent original = objectMapper.readValue(jdbc.queryForObject(
+                "SELECT payload FROM event_outbox WHERE event_id=?", String.class, eventId), OrderEvent.class);
+        for (int i = 0; i < 3; i++) {
+            kafka.send(KafkaConfig.ORDER_EVENTS_TOPIC, original.getOrderNo(), original).get(20, TimeUnit.SECONDS);
+        }
+        // Same partition, new ID: its notification is a processing fence after the duplicates.
+        OrderEvent fence = objectMapper.readValue(objectMapper.writeValueAsString(original), OrderEvent.class);
+        fence.setEventId(UUID.randomUUID().toString());
+        kafka.send(KafkaConfig.ORDER_EVENTS_TOPIC, original.getOrderNo(), fence).get(20, TimeUnit.SECONDS);
+        Awaitility.await().atMost(Duration.ofSeconds(40)).untilAsserted(() -> {
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM processed_event WHERE event_id=?"
+                    + " AND consumer_name='notification'", Integer.class, fence.getEventId())).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE related_order_id=?",
+                    Integer.class, orderId)).isEqualTo(2); // original + fence, never duplicates
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM processed_event WHERE event_id=?"
+                    + " AND consumer_name='notification'", Integer.class, eventId)).isEqualTo(1);
+        });
+        System.out.println("EVIDENCE recovery: outbox=SENT consumers=4 es-document=present duplicate-replays=3 notifications=2(original+fence)");
+    }
+
+    private long createEvidenceOrder(String studentToken, String label) {
+        ResponseEntity<JsonNode> response = rest.exchange(url("/api/orders"), HttpMethod.POST,
+                jsonEntity(Map.of("orderType", 2, "pickupLocation", label,
+                        "deliveryLocation", "验收宿舍", "packages", List.of(Map.of("size", "small")),
+                        "tip", 0), studentToken), JsonNode.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        long id = response.getBody().path("data").path("id").asLong();
+        assertThat(id).isPositive();
+        return id;
+    }
 
     /**
      * The index is written to through the low-level client, which would leave Elasticsearch
